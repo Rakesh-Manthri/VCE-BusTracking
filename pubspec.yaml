@@ -13,6 +13,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   # PHASE 3: Added the webview plugin here
   webview_flutter: ^4.10.0
+  geolocator: ^13.0.2
+  firebase_core: ^4.5.0
+  firebase_auth: ^6.2.0
+  cloud_firestore: ^6.1.3
 
 dev_dependencies:
   flutter_test:

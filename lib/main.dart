@@ -1,53 +1,65 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'screens/login_screen.dart';
+import 'screens/bus_list_screen.dart';
 
-void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: MapScreen(),
-  ));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const MyApp());
 }
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
-}
-
-class _MapScreenState extends State<MapScreen> {
-  late final WebViewController controller;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Initialize the webview controller
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted) // REQUIRED for Leaflet
-      ..setBackgroundColor(const Color(0x00000000))
-    // This loads the file you registered in pubspec.yaml
-      ..loadFlutterAsset('assets/map.html');
-  }
-
-  @override
-
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Navigation Tracker"),
-        backgroundColor: Colors.blueAccent,
+    return MaterialApp(
+      title: 'VCE Bus Tracker',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1A237E),
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+        fontFamily: 'Roboto',
       ),
-      body: WebViewWidget(controller: controller),
+      home: const AuthGate(),
+    );
+  }
+}
 
-      // Adding the interactive button here
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // This is the "Bridge": Sending data from Dart to JS
-          controller.runJavaScript("centerMap(17.3850, 78.4867);");
-        },
-        child: const Icon(Icons.my_location),
-      ),
+/// Listens to Firebase Auth state and routes accordingly:
+/// - Logged in → BusListScreen
+/// - Logged out → LoginScreen
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF1A237E)),
+            ),
+          );
+        }
+
+        // User is logged in
+        if (snapshot.hasData) {
+          return const BusListScreen();
+        }
+
+        // User is not logged in
+        return const LoginScreen();
+      },
     );
   }
 }
