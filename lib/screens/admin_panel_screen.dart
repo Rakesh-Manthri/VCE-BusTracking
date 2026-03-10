@@ -1,0 +1,966 @@
+import 'package:flutter/material.dart';
+import '../models/bus_model.dart';
+import '../models/bus_stop_model.dart';
+import '../services/firestore_service.dart';
+
+class AdminPanelScreen extends StatefulWidget {
+  const AdminPanelScreen({super.key});
+
+  @override
+  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
+}
+
+class _AdminPanelScreenState extends State<AdminPanelScreen> {
+  final _firestoreService = FirestoreService();
+
+  // ─── ADD BUS DIALOG (two-step) ───────────────────────────────────────────
+
+  Future<void> _showAddBusDialog() async {
+    // Step 1: choose type
+    final type = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Add New Bus',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select the type of bus you want to add:',
+              style: TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            _typeButton(
+              ctx: ctx,
+              value: 'normal',
+              icon: Icons.directions_bus_rounded,
+              title: 'Normal Bus',
+              subtitle: 'Free-roaming bus without a fixed route',
+              color: const Color(0xFF1A237E),
+            ),
+            const SizedBox(height: 12),
+            _typeButton(
+              ctx: ctx,
+              value: 'fixed',
+              icon: Icons.route_rounded,
+              title: 'Fixed Route Bus',
+              subtitle: 'Bus with defined start, stops & destination',
+              color: Colors.teal.shade700,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (type == null || !mounted) return;
+
+    if (type == 'normal') {
+      await _showNormalBusDialog();
+    } else {
+      await _showFixedRouteBusDialog();
+    }
+  }
+
+  Widget _typeButton({
+    required BuildContext ctx,
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.pop(ctx, value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withAlpha(80)),
+          borderRadius: BorderRadius.circular(12),
+          color: color.withAlpha(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withAlpha(20),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: color)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Normal Bus Dialog ─────────────────────────────────────────────────────
+
+  Future<void> _showNormalBusDialog() async {
+    final nameCtrl = TextEditingController();
+    final numberCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.directions_bus_rounded,
+                color: const Color(0xFF1A237E), size: 22),
+            const SizedBox(width: 8),
+            const Text('Normal Bus',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: _inputDec('Bus Name', Icons.directions_bus,
+                  'e.g. Bus C'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: numberCtrl,
+              decoration: _inputDec('Bus Number / Route Label',
+                  Icons.tag, 'e.g. VCE-03'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A237E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final number = numberCtrl.text.trim();
+              if (name.isEmpty) return;
+              await _firestoreService.addBus(
+                name: name,
+                route: number.isEmpty ? name : number,
+                hasFixedRoute: false,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Add Bus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Fixed Route Bus Dialog ───────────────────────────────────────────────
+
+  Future<void> _showFixedRouteBusDialog() async {
+    final nameCtrl = TextEditingController();
+    final routeCtrl = TextEditingController();
+    final startNameCtrl = TextEditingController();
+    final startLatCtrl = TextEditingController();
+    final startLngCtrl = TextEditingController();
+    final endNameCtrl = TextEditingController();
+    final endLatCtrl = TextEditingController();
+    final endLngCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.route_rounded,
+                color: Colors.teal.shade700, size: 22),
+            const SizedBox(width: 8),
+            const Text('Fixed Route Bus',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: _inputDec(
+                    'Bus Name', Icons.directions_bus, 'e.g. Bus A'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: routeCtrl,
+                decoration: _inputDec(
+                    'Route Label', Icons.label, 'e.g. Miyapur → VCE'),
+              ),
+              const SizedBox(height: 16),
+              _sectionLabel('🟢 Starting Point'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: startNameCtrl,
+                decoration: _inputDec(
+                    'Start Name', Icons.place, 'e.g. Miyapur'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: startLatCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: _inputDec(
+                          'Start Lat', Icons.south, '17.4947'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: startLngCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: _inputDec(
+                          'Start Lng', Icons.east, '78.3996'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _sectionLabel('🔴 Destination'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: endNameCtrl,
+                decoration:
+                    _inputDec('End Name', Icons.flag, 'e.g. VCE'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: endLatCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: _inputDec(
+                          'End Lat', Icons.south, '17.3350'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: endLngCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: _inputDec(
+                          'End Lng', Icons.east, '78.5439'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: Colors.teal.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Add stops after creating the bus using "Manage Stops".',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.teal.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final route = routeCtrl.text.trim();
+              final startName = startNameCtrl.text.trim();
+              final endName = endNameCtrl.text.trim();
+              final startLat = double.tryParse(startLatCtrl.text.trim());
+              final startLng = double.tryParse(startLngCtrl.text.trim());
+              final endLat = double.tryParse(endLatCtrl.text.trim());
+              final endLng = double.tryParse(endLngCtrl.text.trim());
+              if (name.isEmpty || startLat == null || startLng == null ||
+                  endLat == null || endLng == null) return;
+              await _firestoreService.addBus(
+                name: name,
+                route: route.isEmpty
+                    ? '${startName.isEmpty ? "Start" : startName} → ${endName.isEmpty ? "End" : endName}'
+                    : route,
+                hasFixedRoute: true,
+                startName: startName.isEmpty ? null : startName,
+                startLat: startLat,
+                startLng: startLng,
+                endName: endName.isEmpty ? null : endName,
+                endLat: endLat,
+                endLng: endLng,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Create Route'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── MANAGE STOPS ─────────────────────────────────────────────────────────
+
+  void _openStopsScreen(Bus bus) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _StopsManagementScreen(bus: bus)),
+    );
+  }
+
+  // ─── BUILD ────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        title: const Text('Admin Panel',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddBusDialog,
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Bus'),
+      ),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A237E),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Text(
+              'Manage Buses & Routes',
+              style: TextStyle(
+                color: Colors.white.withAlpha(210),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: StreamBuilder<List<Bus>>(
+              stream: _firestoreService.getBusesStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFF1A237E)),
+                  );
+                }
+                final buses = snapshot.data ?? [];
+                if (buses.isEmpty) {
+                  return const Center(
+                    child: Text('No buses yet. Tap + to add one.'),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  itemCount: buses.length,
+                  itemBuilder: (_, i) => _BusAdminCard(
+                    bus: buses[i],
+                    onManageStops: buses[i].hasFixedRoute
+                        ? () => _openStopsScreen(buses[i])
+                        : null,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+            fontWeight: FontWeight.w600, fontSize: 13),
+      );
+
+  InputDecoration _inputDec(String label, IconData icon, String hint) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: const Color(0xFF1A237E), size: 20),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+}
+
+// ─── BUS ADMIN CARD ──────────────────────────────────────────────────────────
+
+class _BusAdminCard extends StatelessWidget {
+  final Bus bus;
+  final VoidCallback? onManageStops;
+
+  const _BusAdminCard({required this.bus, this.onManageStops});
+
+  @override
+  Widget build(BuildContext context) {
+    final isOnline = bus.hasActiveDriver;
+    final color = bus.hasFixedRoute
+        ? Colors.teal.shade700
+        : const Color(0xFF1A237E);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(18),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    bus.hasFixedRoute
+                        ? Icons.route_rounded
+                        : Icons.directions_bus,
+                    color: color,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(bus.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 2),
+                      Text(bus.route,
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                // Type badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(18),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    bus.hasFixedRoute ? 'Fixed' : 'Normal',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Live badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? Colors.green.shade50
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.circle,
+                          size: 7,
+                          color: isOnline
+                              ? Colors.green
+                              : Colors.grey.shade400),
+                      const SizedBox(width: 4),
+                      Text(
+                        isOnline ? 'Live' : 'Idle',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isOnline
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (bus.hasFixedRoute) ...[
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.place, size: 14, color: Colors.green.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    bus.startName ?? 'Start',
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward, size: 12,
+                      color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Icon(Icons.flag, size: 14, color: Colors.red.shade600),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      bus.endName ?? 'End',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ),
+                  if (onManageStops != null)
+                    TextButton.icon(
+                      onPressed: onManageStops,
+                      icon: const Icon(Icons.edit_location_alt, size: 16),
+                      label: const Text('Manage Stops'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.teal.shade700,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            if (isOnline && bus.activeDriverName != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Driver: ${bus.activeDriverName}',
+                style: TextStyle(
+                    fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── STOPS MANAGEMENT SCREEN ─────────────────────────────────────────────────
+
+class _StopsManagementScreen extends StatefulWidget {
+  final Bus bus;
+  const _StopsManagementScreen({required this.bus});
+
+  @override
+  State<_StopsManagementScreen> createState() =>
+      _StopsManagementScreenState();
+}
+
+class _StopsManagementScreenState extends State<_StopsManagementScreen> {
+  final _firestoreService = FirestoreService();
+
+  Future<void> _showAddStopDialog(int nextOrder) async {
+    final nameCtrl = TextEditingController();
+    final latCtrl = TextEditingController();
+    final lngCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Add Stop #$nextOrder',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration:
+                  _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: latCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration:
+                  _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: lngCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration:
+                  _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A237E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (name.isEmpty || lat == null || lng == null) return;
+              await _firestoreService.addStop(
+                widget.bus.id,
+                BusStop(
+                  id: '',
+                  name: name,
+                  lat: lat,
+                  lng: lng,
+                  order: nextOrder,
+                ),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Add Stop'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _moveStop(
+      List<BusStop> stops, int index, int delta) async {
+    final targetIndex = index + delta;
+    if (targetIndex < 0 || targetIndex >= stops.length) return;
+    final a = stops[index];
+    final b = stops[targetIndex];
+    await _firestoreService.swapStopOrder(
+      widget.bus.id,
+      a.id,
+      a.order,
+      b.id,
+      b.order,
+    );
+  }
+
+  InputDecoration _inputDec(String label, IconData icon, String hint) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: const Color(0xFF1A237E), size: 20),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        title: Text('${widget.bus.name} — Stops',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: StreamBuilder<List<BusStop>>(
+        stream: _firestoreService.getStopsStream(widget.bus.id),
+        builder: (context, snapshot) {
+          final stops = snapshot.data ?? [];
+
+          return Column(
+            children: [
+              if (stops.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.place_outlined,
+                            size: 60, color: Colors.grey.shade300),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No stops added yet',
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 16),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tap + to add the first stop on this route.',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: stops.length,
+                    itemBuilder: (_, i) {
+                      final stop = stops[i];
+                      final isFirst = i == 0;
+                      final isLast = i == stops.length - 1;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              // Order number
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: const Color(0xFF1A237E)
+                                    .withAlpha(20),
+                                child: Text(
+                                  '${stop.order}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1A237E),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Stop info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(stop.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14)),
+                                    Text(
+                                      '${stop.lat.toStringAsFixed(4)}, ${stop.lng.toStringAsFixed(4)}',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Move up / down
+                              Column(
+                                children: [
+                                  SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(
+                                          Icons.keyboard_arrow_up,
+                                          size: 20),
+                                      color: isFirst
+                                          ? Colors.grey.shade300
+                                          : const Color(0xFF1A237E),
+                                      onPressed: isFirst
+                                          ? null
+                                          : () => _moveStop(stops, i, -1),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(
+                                          Icons.keyboard_arrow_down,
+                                          size: 20),
+                                      color: isLast
+                                          ? Colors.grey.shade300
+                                          : const Color(0xFF1A237E),
+                                      onPressed: isLast
+                                          ? null
+                                          : () => _moveStop(stops, i, 1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Delete
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline,
+                                    color: Colors.red, size: 22),
+                                onPressed: () async {
+                                  final confirm =
+                                      await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title:
+                                          const Text('Delete Stop'),
+                                      content: Text(
+                                          'Remove "${stop.name}"?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(
+                                                  ctx, false),
+                                          child:
+                                              const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(
+                                                  ctx, true),
+                                          style:
+                                              ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.red,
+                                            foregroundColor:
+                                                Colors.white,
+                                          ),
+                                          child:
+                                              const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await _firestoreService.deleteStop(
+                                        widget.bus.id, stop.id);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: StreamBuilder<List<BusStop>>(
+        stream: _firestoreService.getStopsStream(widget.bus.id),
+        builder: (context, snapshot) {
+          final nextOrder = (snapshot.data?.length ?? 0) + 1;
+          return FloatingActionButton.extended(
+            onPressed: () => _showAddStopDialog(nextOrder),
+            backgroundColor: const Color(0xFF1A237E),
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_location_alt),
+            label: const Text('Add Stop'),
+          );
+        },
+      ),
+    );
+  }
+}

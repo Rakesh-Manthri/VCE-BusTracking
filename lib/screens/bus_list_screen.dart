@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../models/bus_model.dart';
 import '../widgets/bus_card.dart';
+import 'admin_login_screen.dart';
 import 'driver_mode_screen.dart';
 import 'tracker_screen.dart';
 
@@ -33,6 +34,19 @@ class _BusListScreenState extends State<BusListScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // Admin access button
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Admin Panel',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminLoginScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             tooltip: 'Logout',
