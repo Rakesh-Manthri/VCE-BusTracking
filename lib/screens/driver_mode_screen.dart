@@ -17,112 +17,207 @@ class DriverModeScreen extends StatefulWidget {
 class _DriverModeScreenState extends State<DriverModeScreen> {
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+
   StreamSubscription<Position>? _positionStream;
+
   bool _isDriving = false;
   bool _isClaiming = true;
   bool _claimFailed = false;
+  String _claimError = '';
+  String _claimStatus = 'Starting…';
+
   Position? _currentPosition;
   int _updateCount = 0;
+  String? _chosenDirection;
 
   @override
   void initState() {
     super.initState();
-    _claimBus();
+    debugPrint('[DriverMode] DriverModeScreen initState — bus=${widget.bus.id}');
+    _startFlow();
   }
 
   @override
   void dispose() {
+    debugPrint('[DriverMode] Disposing — stopping location stream');
     _stopDriving(showSnackbar: false);
     super.dispose();
   }
 
+  // ─── FLOW (GPS-independent claim) ─────────────────────────────────────────
+
+  Future<void> _startFlow() async {
+    debugPrint('[DriverMode] _startFlow() started');
+
+    // Step 1: Phase 3 direction picker for fixed-route buses
+    if (widget.bus.hasFixedRoute) {
+      debugPrint('[DriverMode] Fixed route bus — showing direction picker');
+      _setStatus('Choose direction…');
+      final dir = await _showDirectionPicker();
+      if (!mounted) return;
+      if (dir == null) {
+        debugPrint('[DriverMode] Direction picker cancelled — leaving screen');
+        Navigator.pop(context);
+        return;
+      }
+      _chosenDirection = dir;
+      debugPrint('[DriverMode] Direction selected: $_chosenDirection');
+    }
+
+    // Step 2: Claim Firestore IMMEDIATELY (no GPS dependency)
+    await _claimBus();
+  }
+
+  void _setStatus(String status) {
+    if (mounted) setState(() => _claimStatus = status);
+  }
+
+  // ─── CLAIM ────────────────────────────────────────────────────────────────
+
   Future<void> _claimBus() async {
+    debugPrint('[DriverMode] _claimBus() — getting current user');
+    _setStatus('Checking authentication…');
+
     final user = _authService.currentUser;
     if (user == null) {
-      setState(() {
-        _isClaiming = false;
-        _claimFailed = true;
-      });
+      debugPrint('[DriverMode] ERROR — no authenticated user');
+      _setFailed('You are not logged in. Please log out and log back in.');
       return;
     }
 
-    final success = await _firestoreService.claimBus(
-      widget.bus.id,
-      user.uid,
-      user.displayName ?? user.email ?? 'Driver',
-    );
+    debugPrint('[DriverMode] User authenticated: uid=${user.uid} name=${user.displayName}');
+    _setStatus('Claiming bus in Firestore…');
+
+    bool success = false;
+    try {
+      debugPrint('[DriverMode] Attempting Firestore update (5s timeout)…');
+      success = await _firestoreService
+          .claimBus(
+            widget.bus.id,
+            user.uid,
+            user.displayName ?? user.email ?? 'Driver',
+            travelDirection: _chosenDirection,
+          )
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('[DriverMode] claimBus() timed out');
+              return false;
+            },
+          );
+    } catch (e) {
+      debugPrint('[DriverMode] claimBus() threw exception: $e');
+      success = false;
+      if (mounted) {
+        _setFailed('Firestore write failed: $e\n\nCheck your internet connection.');
+      }
+      return;
+    }
 
     if (!mounted) return;
 
     if (success) {
+      debugPrint('[DriverMode] Firestore update SUCCESS — starting GPS in background');
       setState(() {
         _isClaiming = false;
         _isDriving = true;
       });
+      // GPS starts AFTER claim — non-blocking
       _startLocationUpdates();
     } else {
+      debugPrint('[DriverMode] claimBus() returned false — bus already taken or write failed');
+      _setFailed('Could not claim this bus.\nIt may already have an active driver, or Firestore write was blocked.');
+    }
+  }
+
+  void _setFailed(String reason) {
+    debugPrint('[DriverMode] Claim FAILED: $reason');
+    if (mounted) {
       setState(() {
         _isClaiming = false;
         _claimFailed = true;
+        _claimError = reason;
       });
     }
   }
 
+  // ─── GPS (runs in background after claim succeeds) ─────────────────────────
+
   Future<void> _startLocationUpdates() async {
+    debugPrint('[DriverMode] _startLocationUpdates() — checking service');
+
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    debugPrint('[DriverMode] Location service enabled: $serviceEnabled');
     if (!serviceEnabled) {
-      _showError('Location services are disabled. Please enable them.');
+      _showError('Location services are disabled. Bus is claimed but GPS updates are paused.');
       return;
     }
 
+    debugPrint('[DriverMode] Requesting location permission');
     LocationPermission permission = await Geolocator.checkPermission();
+    debugPrint('[DriverMode] Current permission: $permission');
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
+      debugPrint('[DriverMode] Permission after request: $permission');
       if (permission == LocationPermission.denied) {
-        _showError('Location permission is required for driver mode.');
+        _showError('Location permission denied. Bus is claimed but GPS is off.');
         return;
       }
     }
-
     if (permission == LocationPermission.deniedForever) {
-      _showError('Location permissions are permanently denied.');
+      _showError('Location permission permanently denied. Open Settings to enable.');
       return;
     }
 
+    debugPrint('[DriverMode] Permission granted — starting position stream');
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // Update every 5 meters
+      distanceFilter: 5,
     );
 
-    _positionStream =
-        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
-          (Position position) {
-            if (!mounted) return;
-            setState(() {
-              _currentPosition = position;
-              _updateCount++;
-            });
-
-            // Push location to Firestore
-            _firestoreService.updateBusLocation(
-              widget.bus.id,
-              position.latitude,
-              position.longitude,
-            );
-          },
-          onError: (e) {
-            _showError('Location error: $e');
-          },
-        );
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen(
+      (Position position) {
+        if (!mounted) return;
+        debugPrint('[DriverMode] GPS update #${_updateCount + 1}: ${position.latitude}, ${position.longitude}');
+        setState(() {
+          _currentPosition = position;
+          _updateCount++;
+        });
+        _firestoreService.updateBusLocation(
+          widget.bus.id,
+          position.latitude,
+          position.longitude,
+        ).then((_) {
+          debugPrint('[DriverMode] Firestore lat/lng update success');
+        }).catchError((e) {
+          debugPrint('[DriverMode] Firestore lat/lng update error: $e');
+        });
+      },
+      onError: (e) {
+        debugPrint('[DriverMode] GPS stream error: $e');
+        _showError('GPS error: $e');
+      },
+    );
   }
 
+  // ─── STOP DRIVING ────────────────────────────────────────────────────────
+
   Future<void> _stopDriving({bool showSnackbar = true}) async {
+    debugPrint('[DriverMode] _stopDriving() called');
     await _positionStream?.cancel();
     _positionStream = null;
 
     final user = _authService.currentUser;
     if (user != null) {
-      await _firestoreService.releaseBus(widget.bus.id, user.uid);
+      debugPrint('[DriverMode] Releasing bus in Firestore');
+      try {
+        await _firestoreService.releaseBus(widget.bus.id, user.uid);
+        debugPrint('[DriverMode] Bus released successfully');
+      } catch (e) {
+        debugPrint('[DriverMode] releaseBus() error: $e');
+      }
     }
 
     if (mounted) {
@@ -141,26 +236,137 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
   }
 
   void _showError(String message) {
+    debugPrint('[DriverMode] showError: $message');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
   }
+
+  // ─── DEBUG: FORCE CLAIM (bypasses all checks) ─────────────────────────────
+
+  Future<void> _forceClaim() async {
+    debugPrint('[DriverMode] FORCE CLAIM triggered');
+    final user = _authService.currentUser;
+    if (user == null) {
+      _showError('Not logged in');
+      return;
+    }
+    try {
+      await _firestoreService.forceClaimBus(
+        busId: widget.bus.id,
+        userId: user.uid,
+        userName: user.displayName ?? 'Debug Driver',
+        travelDirection: _chosenDirection,
+      );
+      debugPrint('[DriverMode] FORCE CLAIM Firestore write done — checking...');
+      if (mounted) {
+        setState(() {
+          _isClaiming = false;
+          _isDriving = true;
+          _claimFailed = false;
+        });
+        _startLocationUpdates();
+      }
+    } catch (e) {
+      debugPrint('[DriverMode] FORCE CLAIM error: $e');
+      _showError('Force claim failed: $e');
+    }
+  }
+
+  // ─── DIRECTION PICKER ─────────────────────────────────────────────────────
+
+  Future<String?> _showDirectionPicker() {
+    final startName = widget.bus.startName ?? 'Start';
+    final endName = widget.bus.endName ?? 'End';
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Choose Direction',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Which direction are you driving today?',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            const SizedBox(height: 20),
+            _directionButton(ctx: ctx, value: 'forward',
+                from: startName, to: endName, color: Colors.teal.shade700),
+            const SizedBox(height: 12),
+            _directionButton(ctx: ctx, value: 'backward',
+                from: endName, to: startName, color: Colors.orange.shade700),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _directionButton({
+    required BuildContext ctx,
+    required String value,
+    required String from,
+    required String to,
+    required Color color,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.pop(ctx, value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withAlpha(80)),
+          borderRadius: BorderRadius.circular(12),
+          color: color.withAlpha(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.circle, size: 10, color: Colors.green.shade600),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(from,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, color: color, fontSize: 14)),
+            ),
+            Icon(Icons.arrow_forward_rounded, color: color, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(to,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, color: color, fontSize: 14)),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.flag, size: 10, color: Colors.red.shade600),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── BUILD ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text(
-          'Driving: ${widget.bus.name}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: Text('Driving: ${widget.bus.name}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.orange.shade800,
         foregroundColor: Colors.white,
@@ -174,22 +380,19 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
                 builder: (ctx) => AlertDialog(
                   title: const Text('Stop Driving?'),
                   content: const Text(
-                    'This will release the bus and stop sharing your location.',
-                  ),
+                      'This will release the bus and stop sharing your location.'),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Keep Driving'),
-                    ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Keep Driving')),
                     ElevatedButton(
                       onPressed: () {
                         Navigator.pop(ctx);
                         _stopDriving();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white),
                       child: const Text('Stop & Exit'),
                     ),
                   ],
@@ -206,29 +409,46 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
   }
 
   Widget _buildBody() {
-    // Claiming state
+    // ── Claiming state ───────────────────────────────────────────────────────
     if (_isClaiming) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF1A237E)),
-            SizedBox(height: 20),
-            Text(
-              'Claiming bus...',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Checking if bus is available',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFF1A237E)),
+              const SizedBox(height: 20),
+              Text(
+                _claimStatus,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This should take less than 5 seconds.',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+              const SizedBox(height: 32),
+              // ── Debug: Force Claim button ──────────────────────────────────
+              OutlinedButton.icon(
+                onPressed: _forceClaim,
+                icon: const Icon(Icons.bug_report_outlined, size: 16),
+                label: const Text('Force Claim (Debug)',
+                    style: TextStyle(fontSize: 13)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade700,
+                  side: BorderSide(color: Colors.orange.shade300),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    // Claim failed
+    // ── Claim failed state ───────────────────────────────────────────────────
     if (_claimFailed) {
       return Center(
         child: Padding(
@@ -239,46 +459,75 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.block_rounded,
-                  size: 56,
-                  color: Colors.red.shade400,
-                ),
+                    color: Colors.red.shade50, shape: BoxShape.circle),
+                child: Icon(Icons.block_rounded,
+                    size: 56, color: Colors.red.shade400),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Bus Unavailable',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
+              const Text('Could Not Start',
+                  style: TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Text(
-                'This bus already has an active driver.\nPlease wait until the current driver stops.',
+                _claimError.isNotEmpty
+                    ? _claimError
+                    : 'This bus may already have an active driver.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  height: 1.5,
-                ),
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    height: 1.5),
               ),
               const SizedBox(height: 28),
-              ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Go Back'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 14,
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: const Text('Go Back'),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // retry
+                        setState(() {
+                          _isClaiming = true;
+                          _claimFailed = false;
+                          _claimError = '';
+                          _claimStatus = 'Retrying…';
+                        });
+                        _claimBus();
+                      },
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A237E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ),
-                ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // ── Debug: Force Claim button ────────────────────────────────
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isClaiming = true;
+                    _claimFailed = false;
+                    _claimStatus = 'Force claiming…';
+                  });
+                  _forceClaim();
+                },
+                icon: const Icon(Icons.bug_report_outlined, size: 16),
+                label: const Text('Force Claim (Debug)'),
+                style: TextButton.styleFrom(
+                    foregroundColor: Colors.orange.shade700),
               ),
             ],
           ),
@@ -286,13 +535,12 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
       );
     }
 
-    // Driving state
+    // ── Driving state ────────────────────────────────────────────────────────
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           const SizedBox(height: 20),
-          // Pulsing indicator
           Container(
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
@@ -300,78 +548,87 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.green.shade300, width: 3),
             ),
-            child: Icon(
-              Icons.gps_fixed_rounded,
-              size: 56,
-              color: Colors.green.shade600,
-            ),
+            child: Icon(Icons.gps_fixed_rounded,
+                size: 56, color: Colors.green.shade600),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'You are driving!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A237E),
-            ),
-          ),
+          const Text('You are driving!',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A237E))),
           const SizedBox(height: 8),
-          Text(
-            'Your location is being shared in real-time',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
+          Text('Your location is being shared in real-time',
+              style:
+                  TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+
+          // Direction chip
+          if (_chosenDirection != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.teal.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.navigation_rounded,
+                      size: 16, color: Colors.teal.shade700),
+                  const SizedBox(width: 6),
+                  Text(
+                    _chosenDirection == 'forward'
+                        ? '${widget.bus.startName ?? "Start"} → ${widget.bus.endName ?? "End"}'
+                        : '${widget.bus.endName ?? "End"} → ${widget.bus.startName ?? "Start"}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.teal.shade800),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 32),
 
-          // Info cards
-          _infoCard(
-            icon: Icons.directions_bus,
-            label: 'Bus',
-            value: widget.bus.name,
-            color: Colors.blue,
-          ),
+          _infoCard(icon: Icons.directions_bus, label: 'Bus',
+              value: widget.bus.name, color: Colors.blue),
           const SizedBox(height: 12),
-          _infoCard(
-            icon: Icons.route,
-            label: 'Route',
-            value: widget.bus.route,
-            color: Colors.purple,
-          ),
+          _infoCard(icon: Icons.route, label: 'Route',
+              value: widget.bus.route, color: Colors.purple),
           const SizedBox(height: 12),
           _infoCard(
             icon: Icons.location_on,
-            label: 'Position',
+            label: 'GPS Position',
             value: _currentPosition != null
                 ? '${_currentPosition!.latitude.toStringAsFixed(5)}, ${_currentPosition!.longitude.toStringAsFixed(5)}'
-                : 'Waiting for GPS...',
+                : 'Waiting for GPS… (bus is claimed ✓)',
             color: Colors.green,
           ),
           const SizedBox(height: 12),
-          _infoCard(
-            icon: Icons.sync,
-            label: 'Updates Sent',
-            value: '$_updateCount',
-            color: Colors.orange,
-          ),
+          _infoCard(icon: Icons.sync, label: 'Location Updates Sent',
+              value: '$_updateCount', color: Colors.orange),
 
           const Spacer(),
 
-          // Stop driving button
           SizedBox(
             width: double.infinity,
             height: 54,
             child: ElevatedButton.icon(
               onPressed: () => _stopDriving(),
               icon: const Icon(Icons.stop_circle_rounded, size: 24),
-              label: const Text(
-                'Stop Driving',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-              ),
+              label: const Text('Stop Driving',
+                  style:
+                      TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                    borderRadius: BorderRadius.circular(14)),
                 elevation: 3,
               ),
             ),
@@ -395,10 +652,9 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(10),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+              color: Colors.black.withAlpha(10),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
@@ -406,32 +662,26 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
+                color: color.shade50,
+                borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, color: color.shade700, size: 20),
           ),
           const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
         ],
       ),

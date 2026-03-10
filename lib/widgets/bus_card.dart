@@ -43,7 +43,7 @@ class BusCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row: bus name + status
+            // Top row: icon + name/route + status badge
             Row(
               children: [
                 Container(
@@ -52,9 +52,13 @@ class BusCard extends StatelessWidget {
                     color: const Color(0xFF1A237E).withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.directions_bus_rounded,
-                    color: Color(0xFF1A237E),
+                  child: Icon(
+                    bus.hasFixedRoute
+                        ? Icons.route_rounded
+                        : Icons.directions_bus_rounded,
+                    color: bus.hasFixedRoute
+                        ? Colors.teal.shade700
+                        : const Color(0xFF1A237E),
                     size: 28,
                   ),
                 ),
@@ -85,9 +89,7 @@ class BusCard extends StatelessWidget {
                 // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: isActive
                         ? Colors.green.shade50
@@ -102,11 +104,9 @@ class BusCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.circle,
-                        size: 8,
-                        color: isActive ? Colors.green : Colors.grey,
-                      ),
+                      Icon(Icons.circle,
+                          size: 8,
+                          color: isActive ? Colors.green : Colors.grey),
                       const SizedBox(width: 5),
                       Text(
                         isActive ? 'Active' : 'Idle',
@@ -124,49 +124,74 @@ class BusCard extends StatelessWidget {
               ],
             ),
 
-            // Driver info if active
+            // Phase 3: Direction label (shown when bus is active with direction)
+            if (isActive &&
+                bus.hasFixedRoute &&
+                bus.travelDirection != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.navigation_rounded,
+                        size: 14, color: Colors.teal.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      bus.directionLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.teal.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Driver info
             if (isActive) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                    horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.person, size: 16, color: Colors.blue.shade700),
+                    Icon(Icons.person,
+                        size: 16, color: Colors.blue.shade700),
                     const SizedBox(width: 6),
                     Text(
                       'Driver: ${bus.activeDriverName ?? "Unknown"}',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          fontSize: 13,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500),
                     ),
                     if (iAmDriver) ...[
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade700,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
-                          'YOU',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: const Text('YOU',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
                       ),
                     ],
                   ],
@@ -179,19 +204,18 @@ class BusCard extends StatelessWidget {
             // Action buttons
             Row(
               children: [
-                // Drive button
                 Expanded(
                   child: SizedBox(
                     height: 42,
                     child: ElevatedButton.icon(
                       onPressed: canDrive ? onDrive : null,
                       icon: Icon(
-                        iAmDriver ? Icons.stop_circle : Icons.drive_eta,
-                        size: 18,
-                      ),
+                          iAmDriver ? Icons.stop_circle : Icons.drive_eta,
+                          size: 18),
                       label: Text(
                         iAmDriver ? 'Driving...' : 'Drive',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style:
+                            const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: iAmDriver
@@ -201,24 +225,22 @@ class BusCard extends StatelessWidget {
                         disabledBackgroundColor: Colors.grey.shade300,
                         disabledForegroundColor: Colors.grey.shade500,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Track button
                 Expanded(
                   child: SizedBox(
                     height: 42,
                     child: OutlinedButton.icon(
                       onPressed: isActive ? onTrack : null,
-                      icon: const Icon(Icons.map_outlined, size: 18),
-                      label: const Text(
-                        'Track',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
+                      icon:
+                          const Icon(Icons.map_outlined, size: 18),
+                      label: const Text('Track',
+                          style:
+                              TextStyle(fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF1A237E),
                         side: BorderSide(
@@ -228,8 +250,7 @@ class BusCard extends StatelessWidget {
                         ),
                         disabledForegroundColor: Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
