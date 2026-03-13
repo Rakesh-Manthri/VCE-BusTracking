@@ -21,8 +21,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Add New Bus',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Add New Bus',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -101,15 +103,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: color)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: color,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade600)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                 ],
               ),
             ),
@@ -132,11 +138,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.directions_bus_rounded,
-                color: const Color(0xFF1A237E), size: 22),
+            Icon(
+              Icons.directions_bus_rounded,
+              color: const Color(0xFF1A237E),
+              size: 22,
+            ),
             const SizedBox(width: 8),
-            const Text('Normal Bus',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Normal Bus',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -144,14 +155,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           children: [
             TextField(
               controller: nameCtrl,
-              decoration: _inputDec('Bus Name', Icons.directions_bus,
-                  'e.g. Bus C'),
+              decoration: _inputDec(
+                'Bus Name',
+                Icons.directions_bus,
+                'e.g. Bus C',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: numberCtrl,
-              decoration: _inputDec('Bus Number / Route Label',
-                  Icons.tag, 'e.g. VCE-03'),
+              decoration: _inputDec(
+                'Bus Number / Route Label',
+                Icons.tag,
+                'e.g. VCE-03',
+              ),
             ),
           ],
         ),
@@ -165,7 +182,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               backgroundColor: const Color(0xFF1A237E),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () async {
               final name = nameCtrl.text.trim();
@@ -203,11 +221,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.route_rounded,
-                color: Colors.teal.shade700, size: 22),
+            Icon(Icons.route_rounded, color: Colors.teal.shade700, size: 22),
             const SizedBox(width: 8),
-            const Text('Fixed Route Bus',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Fixed Route Bus',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -218,13 +237,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               TextField(
                 controller: nameCtrl,
                 decoration: _inputDec(
-                    'Bus Name', Icons.directions_bus, 'e.g. Bus A'),
+                  'Bus Name',
+                  Icons.directions_bus,
+                  'e.g. Bus A',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: routeCtrl,
                 decoration: _inputDec(
-                    'Route Label', Icons.label, 'e.g. Miyapur → VCE'),
+                  'Route Label',
+                  Icons.label,
+                  'e.g. Miyapur → VCE',
+                ),
               ),
               const SizedBox(height: 16),
               _sectionLabel('🟢 Starting Point'),
@@ -232,7 +257,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               TextField(
                 controller: startNameCtrl,
                 decoration: _inputDec(
-                    'Start Name', Icons.place, 'e.g. Miyapur'),
+                  'Start Name',
+                  Icons.place,
+                  'e.g. Miyapur',
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -241,9 +269,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     child: TextField(
                       controller: startLatCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                        decimal: true,
+                      ),
                       decoration: _inputDec(
-                          'Start Lat', Icons.south, '17.4947'),
+                        'Start Lat',
+                        Icons.south,
+                        '17.4947',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -251,9 +283,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     child: TextField(
                       controller: startLngCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: _inputDec(
-                          'Start Lng', Icons.east, '78.3996'),
+                        decimal: true,
+                      ),
+                      decoration: _inputDec('Start Lng', Icons.east, '78.3996'),
                     ),
                   ),
                 ],
@@ -263,8 +295,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: endNameCtrl,
-                decoration:
-                    _inputDec('End Name', Icons.flag, 'e.g. VCE'),
+                decoration: _inputDec('End Name', Icons.flag, 'e.g. VCE'),
               ),
               const SizedBox(height: 8),
               Row(
@@ -273,9 +304,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     child: TextField(
                       controller: endLatCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: _inputDec(
-                          'End Lat', Icons.south, '17.3350'),
+                        decimal: true,
+                      ),
+                      decoration: _inputDec('End Lat', Icons.south, '17.3350'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -283,9 +314,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     child: TextField(
                       controller: endLngCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: _inputDec(
-                          'End Lng', Icons.east, '78.5439'),
+                        decimal: true,
+                      ),
+                      decoration: _inputDec('End Lng', Icons.east, '78.5439'),
                     ),
                   ),
                 ],
@@ -299,14 +330,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline,
-                        size: 16, color: Colors.teal.shade700),
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.teal.shade700,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Add stops after creating the bus using "Manage Stops".',
                         style: TextStyle(
-                            fontSize: 11, color: Colors.teal.shade800),
+                          fontSize: 11,
+                          color: Colors.teal.shade800,
+                        ),
                       ),
                     ),
                   ],
@@ -325,7 +361,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               backgroundColor: Colors.teal.shade700,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () async {
               final name = nameCtrl.text.trim();
@@ -336,8 +373,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               final startLng = double.tryParse(startLngCtrl.text.trim());
               final endLat = double.tryParse(endLatCtrl.text.trim());
               final endLng = double.tryParse(endLngCtrl.text.trim());
-              if (name.isEmpty || startLat == null || startLng == null ||
-                  endLat == null || endLng == null) return;
+              if (name.isEmpty ||
+                  startLat == null ||
+                  startLng == null ||
+                  endLat == null ||
+                  endLng == null)
+                return;
               await _firestoreService.addBus(
                 name: name,
                 route: route.isEmpty
@@ -369,6 +410,448 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 
+  // ─── EDIT BUS ──────────────────────────────────────────────────────────────
+
+  Future<void> _showEditBusDialog(Bus bus) async {
+    final nameCtrl = TextEditingController(text: bus.name);
+    final routeCtrl = TextEditingController(text: bus.route);
+    final startNameCtrl = TextEditingController(text: bus.startName ?? '');
+    final startLatCtrl = TextEditingController(
+      text: bus.startLat?.toString() ?? '',
+    );
+    final startLngCtrl = TextEditingController(
+      text: bus.startLng?.toString() ?? '',
+    );
+    final endNameCtrl = TextEditingController(text: bus.endName ?? '');
+    final endLatCtrl = TextEditingController(
+      text: bus.endLat?.toString() ?? '',
+    );
+    final endLngCtrl = TextEditingController(
+      text: bus.endLng?.toString() ?? '',
+    );
+    bool isFixed = bus.hasFixedRoute;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.edit, color: Colors.blue.shade700, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Edit ${bus.name}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: _inputDec(
+                    'Bus Name',
+                    Icons.directions_bus,
+                    'e.g. Bus 1',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: routeCtrl,
+                  decoration: _inputDec(
+                    'Route Label',
+                    Icons.label,
+                    'e.g. Ameerpet → VCE',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ─── Type Toggle ────────────────────────────────────────
+                _sectionLabel('Bus Type'),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setDialogState(() => isFixed = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !isFixed
+                                ? const Color(0xFF1A237E).withAlpha(20)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: !isFixed
+                                  ? const Color(0xFF1A237E)
+                                  : Colors.grey.shade300,
+                              width: !isFixed ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                color: !isFixed
+                                    ? const Color(0xFF1A237E)
+                                    : Colors.grey,
+                                size: 22,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Normal',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: !isFixed
+                                      ? const Color(0xFF1A237E)
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setDialogState(() => isFixed = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isFixed
+                                ? Colors.teal.shade700.withAlpha(20)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isFixed
+                                  ? Colors.teal.shade700
+                                  : Colors.grey.shade300,
+                              width: isFixed ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.route_rounded,
+                                color: isFixed
+                                    ? Colors.teal.shade700
+                                    : Colors.grey,
+                                size: 22,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Fixed Route',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isFixed
+                                      ? Colors.teal.shade700
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Warning when switching Fixed → Normal
+                if (bus.hasFixedRoute && !isFixed) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Switching to Normal will clear start/end points. Existing stops will remain but won\'t be used.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Fixed route fields
+                if (isFixed) ...[
+                  const SizedBox(height: 16),
+                  _sectionLabel('🟢 Starting Point'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: startNameCtrl,
+                    decoration: _inputDec(
+                      'Start Name',
+                      Icons.place,
+                      'e.g. Miyapur',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: startLatCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: _inputDec(
+                            'Start Lat',
+                            Icons.south,
+                            '17.4947',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: startLngCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: _inputDec(
+                            'Start Lng',
+                            Icons.east,
+                            '78.3996',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _sectionLabel('🔴 Destination'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: endNameCtrl,
+                    decoration: _inputDec('End Name', Icons.flag, 'e.g. VCE'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: endLatCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: _inputDec(
+                            'End Lat',
+                            Icons.south,
+                            '17.3350',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: endLngCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: _inputDec(
+                            'End Lng',
+                            Icons.east,
+                            '78.5439',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                final route = routeCtrl.text.trim();
+                if (name.isEmpty) return;
+
+                if (isFixed) {
+                  final startLat = double.tryParse(startLatCtrl.text.trim());
+                  final startLng = double.tryParse(startLngCtrl.text.trim());
+                  final endLat = double.tryParse(endLatCtrl.text.trim());
+                  final endLng = double.tryParse(endLngCtrl.text.trim());
+                  if (startLat == null ||
+                      startLng == null ||
+                      endLat == null ||
+                      endLng == null) {
+                    return;
+                  }
+                  await _firestoreService.updateBus(
+                    busId: bus.id,
+                    name: name,
+                    route: route.isEmpty ? bus.route : route,
+                    hasFixedRoute: true,
+                    startName: startNameCtrl.text.trim().isEmpty
+                        ? null
+                        : startNameCtrl.text.trim(),
+                    startLat: startLat,
+                    startLng: startLng,
+                    endName: endNameCtrl.text.trim().isEmpty
+                        ? null
+                        : endNameCtrl.text.trim(),
+                    endLat: endLat,
+                    endLng: endLng,
+                  );
+                } else {
+                  await _firestoreService.updateBus(
+                    busId: bus.id,
+                    name: name,
+                    route: route.isEmpty ? name : route,
+                    hasFixedRoute: false,
+                  );
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── DELETE BUS ─────────────────────────────────────────────────────────────
+
+  Future<void> _showDeleteBusDialog(Bus bus) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red.shade600,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Delete Bus',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                children: [
+                  const TextSpan(text: 'Are you sure you want to delete '),
+                  TextSpan(
+                    text: bus.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const TextSpan(text: '?'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.red.shade600,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This will permanently delete the bus and all its stops. This action cannot be undone.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _firestoreService.deleteBus(bus.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${bus.name} deleted.'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   // ─── BUILD ────────────────────────────────────────────────────────────────
 
   @override
@@ -376,8 +859,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Admin Panel',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Admin Panel',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
@@ -417,8 +902,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF1A237E)),
+                    child: CircularProgressIndicator(color: Color(0xFF1A237E)),
                   );
                 }
                 final buses = snapshot.data ?? [];
@@ -429,13 +913,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount: buses.length,
                   itemBuilder: (_, i) => _BusAdminCard(
                     bus: buses[i],
                     onManageStops: buses[i].hasFixedRoute
                         ? () => _openStopsScreen(buses[i])
                         : null,
+                    onEdit: () => _showEditBusDialog(buses[i]),
+                    onDelete: () => _showDeleteBusDialog(buses[i]),
                   ),
                 );
               },
@@ -447,10 +935,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Widget _sectionLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-            fontWeight: FontWeight.w600, fontSize: 13),
-      );
+    text,
+    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+  );
 
   InputDecoration _inputDec(String label, IconData icon, String hint) {
     return InputDecoration(
@@ -458,8 +945,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       hintText: hint,
       prefixIcon: Icon(icon, color: const Color(0xFF1A237E), size: 20),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
 }
@@ -469,8 +955,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 class _BusAdminCard extends StatelessWidget {
   final Bus bus;
   final VoidCallback? onManageStops;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _BusAdminCard({required this.bus, this.onManageStops});
+  const _BusAdminCard({
+    required this.bus,
+    this.onManageStops,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -518,20 +1011,30 @@ class _BusAdminCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(bus.name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        bus.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(bus.route,
-                          style: TextStyle(
-                              color: Colors.grey.shade600, fontSize: 13)),
+                      Text(
+                        bus.route,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 // Type badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withAlpha(18),
                     borderRadius: BorderRadius.circular(16),
@@ -549,7 +1052,9 @@ class _BusAdminCard extends StatelessWidget {
                 // Live badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isOnline
                         ? Colors.green.shade50
@@ -559,11 +1064,11 @@ class _BusAdminCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.circle,
-                          size: 7,
-                          color: isOnline
-                              ? Colors.green
-                              : Colors.grey.shade400),
+                      Icon(
+                        Icons.circle,
+                        size: 7,
+                        color: isOnline ? Colors.green : Colors.grey.shade400,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         isOnline ? 'Live' : 'Idle',
@@ -590,12 +1095,10 @@ class _BusAdminCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     bus.startName ?? 'Start',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward, size: 12,
-                      color: Colors.grey),
+                  const Icon(Icons.arrow_forward, size: 12, color: Colors.grey),
                   const SizedBox(width: 6),
                   Icon(Icons.flag, size: 14, color: Colors.red.shade600),
                   const SizedBox(width: 4),
@@ -603,7 +1106,9 @@ class _BusAdminCard extends StatelessWidget {
                     child: Text(
                       bus.endName ?? 'End',
                       style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade700),
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
                   if (onManageStops != null)
@@ -614,9 +1119,13 @@ class _BusAdminCard extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.teal.shade700,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         textStyle: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                 ],
@@ -626,10 +1135,66 @@ class _BusAdminCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 'Driver: ${bus.activeDriverName}',
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
+
+            // ─── CRUD Actions Row ──────────────────────────────────────
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Edit button
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 17,
+                    color: Colors.blue.shade700,
+                  ),
+                  label: Text(
+                    'Edit',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Delete button
+                TextButton.icon(
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 17,
+                    color: Colors.red.shade600,
+                  ),
+                  label: Text(
+                    'Delete',
+                    style: TextStyle(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -644,8 +1209,7 @@ class _StopsManagementScreen extends StatefulWidget {
   const _StopsManagementScreen({required this.bus});
 
   @override
-  State<_StopsManagementScreen> createState() =>
-      _StopsManagementScreenState();
+  State<_StopsManagementScreen> createState() => _StopsManagementScreenState();
 }
 
 class _StopsManagementScreenState extends State<_StopsManagementScreen> {
@@ -659,33 +1223,33 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Add Stop #$nextOrder',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Add Stop #$nextOrder',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameCtrl,
-              decoration:
-                  _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
+              decoration: _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: latCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration:
-                  _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: lngCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration:
-                  _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
             ),
           ],
         ),
@@ -699,7 +1263,8 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
               backgroundColor: const Color(0xFF1A237E),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () async {
               final name = nameCtrl.text.trim();
@@ -725,8 +1290,7 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
     );
   }
 
-  Future<void> _moveStop(
-      List<BusStop> stops, int index, int delta) async {
+  Future<void> _moveStop(List<BusStop> stops, int index, int delta) async {
     final targetIndex = index + delta;
     if (targetIndex < 0 || targetIndex >= stops.length) return;
     final a = stops[index];
@@ -740,14 +1304,94 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
     );
   }
 
+  Future<void> _showEditStopDialog(BusStop stop) async {
+    final nameCtrl = TextEditingController(text: stop.name);
+    final latCtrl = TextEditingController(text: stop.lat.toString());
+    final lngCtrl = TextEditingController(text: stop.lng.toString());
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.edit, color: Colors.blue.shade700, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              'Edit Stop #${stop.order}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: latCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: lngCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final lat = double.tryParse(latCtrl.text.trim());
+              final lng = double.tryParse(lngCtrl.text.trim());
+              if (name.isEmpty || lat == null || lng == null) return;
+              await _firestoreService.updateStop(
+                widget.bus.id,
+                BusStop(
+                  id: stop.id,
+                  name: name,
+                  lat: lat,
+                  lng: lng,
+                  order: stop.order,
+                ),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   InputDecoration _inputDec(String label, IconData icon, String hint) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: Icon(icon, color: const Color(0xFF1A237E), size: 20),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
 
@@ -756,8 +1400,10 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text('${widget.bus.name} — Stops',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          '${widget.bus.name} — Stops',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
@@ -776,19 +1422,26 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.place_outlined,
-                            size: 60, color: Colors.grey.shade300),
+                        Icon(
+                          Icons.place_outlined,
+                          size: 60,
+                          color: Colors.grey.shade300,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'No stops added yet',
                           style: TextStyle(
-                              color: Colors.grey.shade600, fontSize: 16),
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           'Tap + to add the first stop on this route.',
                           style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 13),
+                            color: Colors.grey.shade500,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -814,19 +1467,22 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                               color: Colors.black.withAlpha(15),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ],
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           child: Row(
                             children: [
                               // Order number
                               CircleAvatar(
                                 radius: 18,
-                                backgroundColor: const Color(0xFF1A237E)
-                                    .withAlpha(20),
+                                backgroundColor: const Color(
+                                  0xFF1A237E,
+                                ).withAlpha(20),
                                 child: Text(
                                   '${stop.order}',
                                   style: const TextStyle(
@@ -840,18 +1496,21 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                               // Stop info
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(stop.name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14)),
+                                    Text(
+                                      stop.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                     Text(
                                       '${stop.lat.toStringAsFixed(4)}, ${stop.lng.toStringAsFixed(4)}',
                                       style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade500),
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -865,8 +1524,9 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                                     child: IconButton(
                                       padding: EdgeInsets.zero,
                                       icon: const Icon(
-                                          Icons.keyboard_arrow_up,
-                                          size: 20),
+                                        Icons.keyboard_arrow_up,
+                                        size: 20,
+                                      ),
                                       color: isFirst
                                           ? Colors.grey.shade300
                                           : const Color(0xFF1A237E),
@@ -881,8 +1541,9 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                                     child: IconButton(
                                       padding: EdgeInsets.zero,
                                       icon: const Icon(
-                                          Icons.keyboard_arrow_down,
-                                          size: 20),
+                                        Icons.keyboard_arrow_down,
+                                        size: 20,
+                                      ),
                                       color: isLast
                                           ? Colors.grey.shade300
                                           : const Color(0xFF1A237E),
@@ -893,47 +1554,51 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
                                   ),
                                 ],
                               ),
+                              // Edit
+                              IconButton(
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  color: Colors.blue.shade700,
+                                  size: 20,
+                                ),
+                                onPressed: () => _showEditStopDialog(stop),
+                              ),
                               // Delete
                               IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                    color: Colors.red, size: 22),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                  size: 22,
+                                ),
                                 onPressed: () async {
-                                  final confirm =
-                                      await showDialog<bool>(
+                                  final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title:
-                                          const Text('Delete Stop'),
-                                      content: Text(
-                                          'Remove "${stop.name}"?'),
+                                      title: const Text('Delete Stop'),
+                                      content: Text('Remove "${stop.name}"?'),
                                       actions: [
                                         TextButton(
                                           onPressed: () =>
-                                              Navigator.pop(
-                                                  ctx, false),
-                                          child:
-                                              const Text('Cancel'),
+                                              Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
                                         ),
                                         ElevatedButton(
                                           onPressed: () =>
-                                              Navigator.pop(
-                                                  ctx, true),
-                                          style:
-                                              ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                Colors.red,
-                                            foregroundColor:
-                                                Colors.white,
+                                              Navigator.pop(ctx, true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
                                           ),
-                                          child:
-                                              const Text('Delete'),
+                                          child: const Text('Delete'),
                                         ),
                                       ],
                                     ),
                                   );
                                   if (confirm == true) {
                                     await _firestoreService.deleteStop(
-                                        widget.bus.id, stop.id);
+                                      widget.bus.id,
+                                      stop.id,
+                                    );
                                   }
                                 },
                               ),
