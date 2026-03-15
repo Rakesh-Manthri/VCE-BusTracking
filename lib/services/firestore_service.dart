@@ -30,7 +30,9 @@ class FirestoreService {
     String? travelDirection,
   }) async {
     try {
-      debugPrint('[FirestoreService] claimBus() called — busId=$busId userId=$userId dir=$travelDirection');
+      debugPrint(
+        '[FirestoreService] claimBus() called — busId=$busId userId=$userId dir=$travelDirection',
+      );
 
       // ── Step 1: read current state (5-second timeout) ──────────────────────
       final busDoc = await _firestore
@@ -39,23 +41,30 @@ class FirestoreService {
           .get()
           .timeout(
             const Duration(seconds: 5),
-            onTimeout: () => throw Exception('Firestore read timed out after 5s'),
+            onTimeout: () =>
+                throw Exception('Firestore read timed out after 5s'),
           );
 
       if (!busDoc.exists) {
-        debugPrint('[FirestoreService] claimBus() FAILED — bus document does not exist');
+        debugPrint(
+          '[FirestoreService] claimBus() FAILED — bus document does not exist',
+        );
         return false;
       }
 
       final data = busDoc.data() as Map<String, dynamic>;
       final currentDriver = data['activeDriverId'] as String?;
-      debugPrint('[FirestoreService] claimBus() — current activeDriverId=$currentDriver');
+      debugPrint(
+        '[FirestoreService] claimBus() — current activeDriverId=$currentDriver',
+      );
 
       // ── Step 2: check if another driver already owns it ────────────────────
       if (currentDriver != null &&
           currentDriver.isNotEmpty &&
           currentDriver != userId) {
-        debugPrint('[FirestoreService] claimBus() DENIED — another driver owns this bus');
+        debugPrint(
+          '[FirestoreService] claimBus() DENIED — another driver owns this bus',
+        );
         return false;
       }
 
@@ -72,7 +81,8 @@ class FirestoreService {
           })
           .timeout(
             const Duration(seconds: 5),
-            onTimeout: () => throw Exception('Firestore write timed out after 5s'),
+            onTimeout: () =>
+                throw Exception('Firestore write timed out after 5s'),
           );
 
       debugPrint('[FirestoreService] claimBus() SUCCESS');
@@ -124,10 +134,7 @@ class FirestoreService {
 
   /// Add or update a stop
   Future<void> addStop(String busId, BusStop stop) async {
-    final ref = _firestore
-        .collection('buses')
-        .doc(busId)
-        .collection('stops');
+    final ref = _firestore.collection('buses').doc(busId).collection('stops');
     if (stop.id.isEmpty) {
       await ref.add(stop.toMap());
     } else {
@@ -165,8 +172,7 @@ class FirestoreService {
   /// Fetch admin password from Firestore
   Future<String?> getAdminPassword() async {
     try {
-      final snap =
-          await _firestore.collection('adminConfig').limit(1).get();
+      final snap = await _firestore.collection('adminConfig').limit(1).get();
       if (snap.docs.isEmpty) return null;
       return snap.docs.first.data()['adminPassword'] as String?;
     } catch (_) {
@@ -213,7 +219,9 @@ class FirestoreService {
     required String userName,
     String? travelDirection,
   }) async {
-    debugPrint('[FirestoreService] forceClaimBus() — bypassing ownership check');
+    debugPrint(
+      '[FirestoreService] forceClaimBus() — bypassing ownership check',
+    );
     await _firestore.collection('buses').doc(busId).update({
       'activeDriverId': userId,
       'activeDriverName': userName,
@@ -221,5 +229,60 @@ class FirestoreService {
       'lastUpdated': FieldValue.serverTimestamp(),
     });
     debugPrint('[FirestoreService] forceClaimBus() — write done');
+  }
+
+  /// Update bus details (admin only)
+  Future<void> updateBus({
+    required String busId,
+    required String name,
+    required String route,
+    bool hasFixedRoute = false,
+    String? startName,
+    double? startLat,
+    double? startLng,
+    String? endName,
+    double? endLat,
+    double? endLng,
+  }) async {
+    await _firestore.collection('buses').doc(busId).update({
+      'name': name,
+      'route': route,
+      'hasFixedRoute': hasFixedRoute,
+      'startName': startName,
+      'startLat': startLat,
+      'startLng': startLng,
+      'endName': endName,
+      'endLat': endLat,
+      'endLng': endLng,
+      'lastUpdated': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Delete a bus and all its stops (admin only)
+  Future<void> deleteBus(String busId) async {
+    // First delete all stops in the subcollection
+    final stopsSnap = await _firestore
+        .collection('buses')
+        .doc(busId)
+        .collection('stops')
+        .get();
+
+    final batch = _firestore.batch();
+    for (final doc in stopsSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    // Delete the bus document itself
+    batch.delete(_firestore.collection('buses').doc(busId));
+    await batch.commit();
+  }
+
+  /// Update a stop's details
+  Future<void> updateStop(String busId, BusStop stop) async {
+    await _firestore
+        .collection('buses')
+        .doc(busId)
+        .collection('stops')
+        .doc(stop.id)
+        .update(stop.toMap());
   }
 }
