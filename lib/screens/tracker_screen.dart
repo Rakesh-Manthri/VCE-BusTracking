@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math' show asin, atan2, cos, pi, sin, sqrt;
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/bus_model.dart';
 import '../models/bus_stop_model.dart';
 import '../services/firestore_service.dart';
@@ -20,6 +21,7 @@ class TrackerScreen extends StatefulWidget {
 class _TrackerScreenState extends State<TrackerScreen> {
   late final WebViewController _webController;
   final _firestoreService = FirestoreService();
+  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
   StreamSubscription<Bus?>? _busSubscription;
   StreamSubscription<Position>? _positionStream;
@@ -48,10 +50,12 @@ class _TrackerScreenState extends State<TrackerScreen> {
   bool _busOffRoute = false;
   bool _reachedStop = false;
   bool _boarded = false;
+  bool _hasNotifiedProximity = false;
 
   @override
   void initState() {
     super.initState();
+    _initNotifications();
     _initWebView();
     _startTracking();
 
@@ -60,6 +64,30 @@ class _TrackerScreenState extends State<TrackerScreen> {
         _promptBoardingStatus();
       });
     }
+  }
+
+  Future<void> _initNotifications() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+    await _notificationsPlugin.initialize(initSettings);
+  }
+
+  Future<void> _triggerProximityNotification() async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'proximity_channel',
+      'Proximity Alerts',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+    await _notificationsPlugin.show(
+      0,
+      'Bus Approaching!',
+      'Your bus is less than 500 meters away from your stop.',
+      platformDetails,
+    );
   }
 
   void _promptBoardingStatus() {
@@ -284,20 +312,58 @@ class _TrackerScreenState extends State<TrackerScreen> {
   }
 
   void _drawFixedRouteIfReady() {
-    if (!_mapReady || _fixedRouteDrawn || _stops.isEmpty) return;
-    final stopsJson = jsonEncode(_stops
-        .map((s) => {'name': s.name, 'lat': s.lat, 'lng': s.lng, 'order': s.order})
-        .toList());
+    if (!_mapReady || _fixedRouteDrawn) return;
+
+    List<Map<String, dynamic>> routeData = [];
+
+    if (_stops.isNotEmpty) {
+      routeData = _stops
+          .map((s) => {'name': s.name, 'lat': s.lat, 'lng': s.lng, 'order': s.order})
+          .toList();
+    } else if (widget.bus.hasFixedRoute && widget.bus.startLat != null && widget.bus.endLat != null) {
+      routeData = [
+        {'name': widget.bus.startName ?? 'Start', 'lat': widget.bus.startLat, 'lng': widget.bus.startLng, 'order': 0},
+        {'name': widget.bus.endName ?? 'End', 'lat': widget.bus.endLat, 'lng': widget.bus.endLng, 'order': 1},
+      ];
+    } else {
+      return;
+    }
+
+    final stopsJson = jsonEncode(routeData);
     _webController.runJavaScript('drawFixedRoute(${jsonEncode(stopsJson)});');
     setState(() => _fixedRouteDrawn = true);
   }
 
   // Phase 4: calculate nearest stop using Haversine
   void _updateNearestStop() {
-    if (_stops.isEmpty || _userPosition == null) return;
+    if (_userPosition == null) return;
+
+    List<BusStop> stopsToCheck = _stops;
+
+    if (stopsToCheck.isEmpty && widget.bus.hasFixedRoute && widget.bus.startLat != null && widget.bus.endLat != null) {
+      stopsToCheck = [
+        BusStop(
+          id: 'start',
+          name: widget.bus.startName ?? 'Start',
+          lat: widget.bus.startLat!,
+          lng: widget.bus.startLng!,
+          order: 0,
+        ),
+        BusStop(
+          id: 'end',
+          name: widget.bus.endName ?? 'End',
+          lat: widget.bus.endLat!,
+          lng: widget.bus.endLng!,
+          order: 1,
+        ),
+      ];
+    }
+
+    if (stopsToCheck.isEmpty) return;
+
     BusStop? nearest;
     double minDist = double.infinity;
-    for (final stop in _stops) {
+    for (final stop in stopsToCheck) {
       final d = _haversineMeters(
         _userPosition!.latitude,
         _userPosition!.longitude,
@@ -310,7 +376,17 @@ class _TrackerScreenState extends State<TrackerScreen> {
       }
     }
     if (!mounted) return;
+    
+    if (_nearestStop?.id != nearest?.id) {
+      _hasNotifiedProximity = false;
+    }
+    
     setState(() => _nearestStop = nearest);
+
+    if (minDist < 500 && !_hasNotifiedProximity && _isNavigating) {
+      _triggerProximityNotification();
+      _hasNotifiedProximity = true;
+    }
   }
 
   double _haversineMeters(double lat1, double lng1, double lat2, double lng2) {

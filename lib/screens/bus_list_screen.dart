@@ -17,6 +17,15 @@ class BusListScreen extends StatefulWidget {
 class _BusListScreenState extends State<BusListScreen> {
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +129,33 @@ class _BusListScreenState extends State<BusListScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search buses, routes, locations...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF1A237E)),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(color: Color(0xFF1A237E), width: 2),
+                ),
+              ),
+            ),
+          ),
 
           // Bus list
           Expanded(
@@ -165,7 +200,17 @@ class _BusListScreenState extends State<BusListScreen> {
                   );
                 }
 
-                final buses = snapshot.data ?? [];
+                var buses = snapshot.data ?? [];
+
+                if (_searchQuery.isNotEmpty) {
+                  buses = buses.where((bus) {
+                    final nameMatch = bus.name.toLowerCase().contains(_searchQuery);
+                    final routeMatch = bus.route.toLowerCase().contains(_searchQuery);
+                    final startMatch = (bus.startName ?? '').toLowerCase().contains(_searchQuery);
+                    final endMatch = (bus.endName ?? '').toLowerCase().contains(_searchQuery);
+                    return nameMatch || routeMatch || startMatch || endMatch;
+                  }).toList();
+                }
 
                 if (buses.isEmpty) {
                   return Center(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../models/bus_model.dart';
 import '../models/bus_stop_model.dart';
 import '../services/firestore_service.dart';
@@ -288,6 +290,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       decoration: _inputDec('Start Lng', Icons.east, '78.3996'),
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.map, color: Colors.teal),
+                    tooltip: 'Pick on Map',
+                    onPressed: () async {
+                      final currentLat = double.tryParse(startLatCtrl.text);
+                      final currentLng = double.tryParse(startLngCtrl.text);
+                      final result = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                      );
+                      if (result != null) {
+                        startLatCtrl.text = result['lat'].toStringAsFixed(6);
+                        startLngCtrl.text = result['lng'].toStringAsFixed(6);
+                      }
+                    },
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -318,6 +336,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                       decoration: _inputDec('End Lng', Icons.east, '78.5439'),
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.map, color: Colors.teal),
+                    tooltip: 'Pick on Map',
+                    onPressed: () async {
+                      final currentLat = double.tryParse(endLatCtrl.text);
+                      final currentLng = double.tryParse(endLngCtrl.text);
+                      final result = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                      );
+                      if (result != null) {
+                        endLatCtrl.text = result['lat'].toStringAsFixed(6);
+                        endLngCtrl.text = result['lng'].toStringAsFixed(6);
+                      }
+                    },
                   ),
                 ],
               ),
@@ -642,6 +676,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           ),
                         ),
                       ),
+                      IconButton(
+                        icon: const Icon(Icons.map, color: Colors.teal),
+                        tooltip: 'Pick on Map',
+                        onPressed: () async {
+                          final currentLat = double.tryParse(startLatCtrl.text);
+                          final currentLng = double.tryParse(startLngCtrl.text);
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                          );
+                          if (result != null) {
+                            startLatCtrl.text = result['lat'].toStringAsFixed(6);
+                            startLngCtrl.text = result['lng'].toStringAsFixed(6);
+                          }
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -680,6 +730,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             '78.5439',
                           ),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.map, color: Colors.teal),
+                        tooltip: 'Pick on Map',
+                        onPressed: () async {
+                          final currentLat = double.tryParse(endLatCtrl.text);
+                          final currentLng = double.tryParse(endLngCtrl.text);
+                          final result = await showDialog<Map<String, dynamic>>(
+                            context: context,
+                            builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                          );
+                          if (result != null) {
+                            endLatCtrl.text = result['lat'].toStringAsFixed(6);
+                            endLngCtrl.text = result['lng'].toStringAsFixed(6);
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -1592,20 +1658,47 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
               decoration: _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: latCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lngCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: latCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: lngCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.map, color: Color(0xFF1A237E), size: 36),
+                  tooltip: 'Pick on Map',
+                  onPressed: () async {
+                    final currentLat = double.tryParse(latCtrl.text);
+                    final currentLng = double.tryParse(lngCtrl.text);
+                    final result = await showDialog<Map<String, dynamic>>(
+                      context: context,
+                      builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                    );
+                    if (result != null) {
+                      latCtrl.text = result['lat'].toStringAsFixed(6);
+                      lngCtrl.text = result['lng'].toStringAsFixed(6);
+                    }
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -1687,20 +1780,47 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
               decoration: _inputDec('Stop Name', Icons.place, 'e.g. JNTU'),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: latCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lngCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: latCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDec('Latitude', Icons.south, 'e.g. 17.4947'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: lngCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDec('Longitude', Icons.east, 'e.g. 78.3996'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.map, color: Colors.blue, size: 36),
+                  tooltip: 'Pick on Map',
+                  onPressed: () async {
+                    final currentLat = double.tryParse(latCtrl.text);
+                    final currentLng = double.tryParse(lngCtrl.text);
+                    final result = await showDialog<Map<String, dynamic>>(
+                      context: context,
+                      builder: (_) => MapPickerModal(initialLat: currentLat, initialLng: currentLng),
+                    );
+                    if (result != null) {
+                      latCtrl.text = result['lat'].toStringAsFixed(6);
+                      lngCtrl.text = result['lng'].toStringAsFixed(6);
+                    }
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -2101,6 +2221,89 @@ class _DriverAdminCard extends StatelessWidget {
                   color: Colors.red.shade400, size: 20),
               tooltip: 'Delete driver',
               onPressed: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── MAP PICKER MODAL ────────────────────────────────────────────────────────
+
+class MapPickerModal extends StatefulWidget {
+  final double? initialLat;
+  final double? initialLng;
+
+  const MapPickerModal({super.key, this.initialLat, this.initialLng});
+
+  @override
+  State<MapPickerModal> createState() => _MapPickerModalState();
+}
+
+class _MapPickerModalState extends State<MapPickerModal> {
+  late final WebViewController _webController;
+
+  @override
+  void initState() {
+    super.initState();
+    _webController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..addJavaScriptChannel(
+        'LocationPicked',
+        onMessageReceived: (JavaScriptMessage message) {
+          final data = jsonDecode(message.message);
+          Navigator.pop(context, {'lat': data['lat'], 'lng': data['lng']});
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            final latArg = widget.initialLat != null ? widget.initialLat.toString() : 'null';
+            final lngArg = widget.initialLng != null ? widget.initialLng.toString() : 'null';
+            _webController.runJavaScript('initPickerMap($latArg, $lngArg);');
+          },
+        ),
+      )
+      ..loadFlutterAsset('assets/map.html');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        width: MediaQuery.of(context).size.width,
+        child: Stack(
+          children: [
+            WebViewWidget(controller: _webController),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: FloatingActionButton.small(
+                onPressed: () => Navigator.pop(context),
+                backgroundColor: Colors.white,
+                child: const Icon(Icons.close, color: Colors.black),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(200),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Tap map to pick location',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
         ),
