@@ -856,82 +856,404 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text(
-          'Admin Panel',
-          style: TextStyle(fontWeight: FontWeight.bold),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F7FA),
+        appBar: AppBar(
+          title: const Text(
+            'Admin Panel',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: const Color(0xFF1A237E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          bottom: const TabBar(
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            tabs: [
+              Tab(icon: Icon(Icons.directions_bus_rounded), text: 'Buses'),
+              Tab(icon: Icon(Icons.badge_rounded), text: 'Drivers'),
+            ],
+          ),
         ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
-        elevation: 0,
+        body: TabBarView(
+          children: [
+            // ── TAB 1: BUSES ────────────────────────────────────────────────
+            _buildBusesTab(),
+            // ── TAB 2: DRIVERS ──────────────────────────────────────────────
+            _buildDriversTab(),
+          ],
+        ),
+        // FAB only shown in context of whichever tab is active
+        floatingActionButton: _FABSwitcher(
+          onAddBus: _showAddBusDialog,
+          onAddDriver: _showAddDriverDialog,
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddBusDialog,
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Bus'),
-      ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1A237E),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Text(
-              'Manage Buses & Routes',
-              style: TextStyle(
-                color: Colors.white.withAlpha(210),
-                fontSize: 14,
-              ),
+    );
+  }
+
+  Widget _buildBusesTab() {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A237E),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: StreamBuilder<List<Bus>>(
-              stream: _firestoreService.getBusesStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF1A237E)),
-                  );
-                }
-                final buses = snapshot.data ?? [];
-                if (buses.isEmpty) {
-                  return const Center(
-                    child: Text('No buses yet. Tap + to add one.'),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  itemCount: buses.length,
-                  itemBuilder: (_, i) => _BusAdminCard(
-                    bus: buses[i],
-                    onManageStops: buses[i].hasFixedRoute
-                        ? () => _openStopsScreen(buses[i])
-                        : null,
-                    onEdit: () => _showEditBusDialog(buses[i]),
-                    onDelete: () => _showDeleteBusDialog(buses[i]),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Text(
+            'Manage Buses & Routes',
+            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 14),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: StreamBuilder<List<Bus>>(
+            stream: _firestoreService.getBusesStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF1A237E)));
+              }
+              final buses = snapshot.data ?? [];
+              if (buses.isEmpty) {
+                return const Center(
+                    child: Text('No buses yet. Tap + to add one.'));
+              }
+              return ListView.builder(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: buses.length,
+                itemBuilder: (_, i) => _BusAdminCard(
+                  bus: buses[i],
+                  onManageStops:
+                      buses[i].hasFixedRoute ? () => _openStopsScreen(buses[i]) : null,
+                  onEdit: () => _showEditBusDialog(buses[i]),
+                  onDelete: () => _showDeleteBusDialog(buses[i]),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── DRIVERS TAB ──────────────────────────────────────────────────────────
+
+  Widget _buildDriversTab() {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.deepPurple.shade700,
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Text(
+            'Manage Driver Accounts',
+            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 14),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: StreamBuilder<List<dynamic>>(
+            stream: _firestoreService.getDriversStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                    child: CircularProgressIndicator(
+                        color: Colors.deepPurple));
+              }
+              final drivers = snapshot.data ?? [];
+              if (drivers.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.badge_outlined,
+                          size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      Text('No drivers yet.',
+                          style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 6),
+                      Text('Tap + to add a driver account.',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 13)),
+                    ],
                   ),
                 );
-              },
+              }
+              return ListView.builder(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: drivers.length,
+                itemBuilder: (_, i) {
+                  final d = drivers[i];
+                  return _DriverAdminCard(
+                    driver: d,
+                    onEdit: () => _showEditDriverDialog(d),
+                    onDelete: () => _showDeleteDriverDialog(d),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── ADD DRIVER DIALOG ────────────────────────────────────────────────────
+
+  Future<void> _showAddDriverDialog() async {
+    final idCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    bool obscure = true;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDs) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Icon(Icons.person_add_rounded,
+                  color: Colors.deepPurple.shade700, size: 22),
+              const SizedBox(width: 8),
+              const Text('Add Driver',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: _inputDec('Driver ID', Icons.badge, 'e.g. DRV001'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: _inputDec('Full Name', Icons.person, 'e.g. Ravi Kumar'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    hintText: 'Create a password',
+                    prefixIcon: Icon(Icons.lock_outline,
+                        color: const Color(0xFF1A237E), size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                          obscure ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDs(() => obscure = !obscure),
+                    ),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                  ),
+                ),
+              ],
             ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                final id = idCtrl.text.trim();
+                final name = nameCtrl.text.trim();
+                final pass = passCtrl.text;
+                if (id.isEmpty || name.isEmpty || pass.isEmpty) return;
+                await _firestoreService.addDriver(
+                  driverId: id,
+                  driverName: name,
+                  password: pass,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Add Driver'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── EDIT DRIVER DIALOG ───────────────────────────────────────────────────
+
+  Future<void> _showEditDriverDialog(dynamic driver) async {
+    final idCtrl = TextEditingController(text: driver.driverId);
+    final nameCtrl = TextEditingController(text: driver.driverName);
+    final passCtrl = TextEditingController(text: driver.password);
+    bool obscure = true;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDs) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Icon(Icons.edit_rounded,
+                  color: Colors.blue.shade700, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Edit ${driver.driverName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration:
+                      _inputDec('Driver ID', Icons.badge, 'e.g. DRV001'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: _inputDec(
+                      'Full Name', Icons.person, 'e.g. Ravi Kumar'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: Icon(Icons.lock_outline,
+                        color: const Color(0xFF1A237E), size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                          obscure ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDs(() => obscure = !obscure),
+                    ),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                final id = idCtrl.text.trim();
+                final name = nameCtrl.text.trim();
+                final pass = passCtrl.text;
+                if (id.isEmpty || name.isEmpty || pass.isEmpty) return;
+                await _firestoreService.updateDriver(
+                  docId: driver.id,
+                  driverId: id,
+                  driverName: name,
+                  password: pass,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── DELETE DRIVER DIALOG ─────────────────────────────────────────────────
+
+  Future<void> _showDeleteDriverDialog(dynamic driver) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.red.shade600, size: 24),
+            const SizedBox(width: 8),
+            const Text('Delete Driver',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete ${driver.driverName} (${driver.driverId})?',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (confirm == true) {
+      await _firestoreService.deleteDriver(driver.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${driver.driverName} deleted.'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _sectionLabel(String text) => Text(
@@ -949,6 +1271,40 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 }
+
+// ─── FAB SWITCHER (shows correct FAB per tab) ──────────────────────────────
+
+class _FABSwitcher extends StatefulWidget {
+  final VoidCallback onAddBus;
+  final VoidCallback onAddDriver;
+
+  const _FABSwitcher({required this.onAddBus, required this.onAddDriver});
+
+  @override
+  State<_FABSwitcher> createState() => _FABSwitcherState();
+}
+
+class _FABSwitcherState extends State<_FABSwitcher> {
+  @override
+  Widget build(BuildContext context) {
+    final tabIndex = DefaultTabController.of(context).index;
+    final isDriversTab = tabIndex == 1;
+
+    DefaultTabController.of(context).addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    return FloatingActionButton.extended(
+      onPressed: isDriversTab ? widget.onAddDriver : widget.onAddBus,
+      backgroundColor:
+          isDriversTab ? Colors.deepPurple.shade700 : const Color(0xFF1A237E),
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add),
+      label: Text(isDriversTab ? 'Add Driver' : 'Add Bus'),
+    );
+  }
+}
+
 
 // ─── BUS ADMIN CARD ──────────────────────────────────────────────────────────
 
@@ -1629,3 +1985,127 @@ class _StopsManagementScreenState extends State<_StopsManagementScreen> {
     );
   }
 }
+
+// ─── DRIVER ADMIN CARD ───────────────────────────────────────────────────────
+
+class _DriverAdminCard extends StatelessWidget {
+  final dynamic driver;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _DriverAdminCard({
+    required this.driver,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(color: Colors.deepPurple.shade100, width: 1.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            // Avatar
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.deepPurple.shade50,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.deepPurple.shade200),
+              ),
+              child: Center(
+                child: Text(
+                  driver.driverName.isNotEmpty
+                      ? driver.driverName[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepPurple.shade700,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    driver.driverName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A237E),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'ID: ${driver.driverId}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.deepPurple.shade700,
+                          ),
+                        ),
+                      ),
+                      if (driver.assignedBusId != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.directions_bus_rounded,
+                            size: 13, color: Colors.grey.shade500),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Assigned',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Actions
+            IconButton(
+              icon: Icon(Icons.edit_rounded, color: Colors.blue.shade600, size: 20),
+              tooltip: 'Edit driver',
+              onPressed: onEdit,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete_outline_rounded,
+                  color: Colors.red.shade400, size: 20),
+              tooltip: 'Delete driver',
+              onPressed: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
