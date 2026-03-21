@@ -35,6 +35,21 @@ class FirestoreService {
         '[FirestoreService] claimBus() called — busId=$busId userId=$userId dir=$travelDirection',
       );
 
+      // ── Step 0: Check if user is already driving another bus ─────────────
+      final userDrivingQuery = await _firestore
+          .collection('buses')
+          .where('activeDriverId', isEqualTo: userId)
+          .get();
+
+      if (userDrivingQuery.docs.isNotEmpty) {
+        // Driver is driving at least one bus. Let's make sure it's not THIS bus.
+        final drivingOtherBus = userDrivingQuery.docs.any((doc) => doc.id != busId);
+        if (drivingOtherBus) {
+          debugPrint('[FirestoreService] claimBus() DENIED — user already driving another bus');
+          throw Exception('already_driving_other_bus');
+        }
+      }
+
       // ── Step 1: read current state (5-second timeout) ──────────────────────
       final busDoc = await _firestore
           .collection('buses')
@@ -112,12 +127,16 @@ class FirestoreService {
   }
 
   /// Update the bus location (called by driver)
-  Future<void> updateBusLocation(String busId, double lat, double lng) async {
-    await _firestore.collection('buses').doc(busId).update({
+  Future<void> updateBusLocation(String busId, double lat, double lng, {String? travelDirection}) async {
+    final Map<String, dynamic> data = {
       'lat': lat,
       'lng': lng,
       'lastUpdated': FieldValue.serverTimestamp(),
-    });
+    };
+    if (travelDirection != null) {
+      data['travelDirection'] = travelDirection;
+    }
+    await _firestore.collection('buses').doc(busId).update(data);
   }
 
   // ─── STOPS ────────────────────────────────────────────────────────────────

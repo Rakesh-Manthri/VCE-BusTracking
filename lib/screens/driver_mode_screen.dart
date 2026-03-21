@@ -63,10 +63,13 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
 
   Future<void> _startFlow() async {
     debugPrint('[DriverMode] _startFlow() started');
+    
+    // Wait for the widget to finish building before showing a dialog
+    await Future.delayed(Duration.zero);
 
-    // Step 1: Phase 3 direction picker for fixed-route buses
-    if (widget.bus.hasFixedRoute) {
-      debugPrint('[DriverMode] Fixed route bus — showing direction picker');
+    // Step 1: Phase 3 direction picker for normal buses
+    if (!widget.bus.hasFixedRoute) {
+      debugPrint('[DriverMode] Normal bus — showing direction picker');
       _setStatus('Choose direction…');
       final dir = await _showDirectionPicker();
       if (!mounted) return;
@@ -142,7 +145,11 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
       debugPrint('[DriverMode] claimBus() threw exception: $e');
       success = false;
       if (mounted) {
-        _setFailed('Firestore write failed: $e\n\nCheck your internet connection.');
+        if (e.toString().contains('already_driving_other_bus')) {
+          _setFailed('You are already driving another bus.\nPlease stop driving that bus before claiming a new one.');
+        } else {
+          _setFailed('Firestore write failed: $e\n\nCheck your internet connection.');
+        }
       }
       return;
     }
@@ -240,6 +247,26 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
       (Position position) {
         if (!mounted) return;
         debugPrint('[DriverMode] GPS update #${_updateCount + 1}: ${position.latitude}, ${position.longitude}');
+        
+        // ─── SMART AUTO-DIRECTION DETECTION ─────────────────────────────────────
+        if (widget.bus.hasFixedRoute && _chosenDirection == null) {
+          if (widget.bus.startLat != null && widget.bus.startLng != null &&
+              widget.bus.endLat != null && widget.bus.endLng != null) {
+            
+            final distToStart = Geolocator.distanceBetween(
+              position.latitude, position.longitude,
+              widget.bus.startLat!, widget.bus.startLng!,
+            );
+            final distToEnd = Geolocator.distanceBetween(
+              position.latitude, position.longitude,
+              widget.bus.endLat!, widget.bus.endLng!,
+            );
+
+            _chosenDirection = distToStart < distToEnd ? 'forward' : 'backward';
+            debugPrint('[DriverMode] Auto-detected direction: $_chosenDirection');
+          }
+        }
+        
         setState(() {
           _currentPosition = position;
           _updateCount++;
@@ -248,6 +275,7 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
           widget.bus.id,
           position.latitude,
           position.longitude,
+          travelDirection: _chosenDirection,
         ).then((_) {
           debugPrint('[DriverMode] Firestore lat/lng update success');
         }).catchError((e) {
@@ -321,16 +349,21 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
 
   Future<void> _forceClaim() async {
     debugPrint('[DriverMode] FORCE CLAIM triggered');
-    final user = _authService.currentUser;
-    if (user == null) {
-      _showError('Not logged in');
+    
+    // Support both Driver session and Firebase Auth paths
+    final userId = widget.driverId ?? _authService.currentUser?.uid;
+    final userName = widget.driverName ?? _authService.currentUser?.displayName ?? 'Debug Driver';
+
+    if (userId == null) {
+      _showError('Not logged in (Driver session missing)');
       return;
     }
+
     try {
       await _firestoreService.forceClaimBus(
         busId: widget.bus.id,
-        userId: user.uid,
-        userName: user.displayName ?? 'Debug Driver',
+        userId: userId,
+        userName: userName,
         travelDirection: _chosenDirection,
       );
       debugPrint('[DriverMode] FORCE CLAIM Firestore write done — checking...');

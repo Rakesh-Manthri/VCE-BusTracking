@@ -98,6 +98,50 @@
             walkRenderer.setMap(map);
         }
 
+        // ─── ADMIN MAP PICKER ─────────────────────────────────────────────────────
+        function initPickerMap(lat, lng) {
+            var centerPos = { lat: 17.3850, lng: 78.4867 }; // Default Hyderabad
+            if (lat !== undefined && lng !== undefined && lat !== null && lng !== null) {
+                centerPos = { lat: parseFloat(lat), lng: parseFloat(lng) };
+            }
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: centerPos,
+                zoom: 16,
+                mapTypeId: 'roadmap',
+                zoomControl: true,
+                streetViewControl: false,
+                fullscreenControl: false,
+                mapTypeControl: false
+            });
+
+            var marker = new google.maps.Marker({
+                position: centerPos,
+                map: map,
+                title: 'Selected Location',
+                animation: google.maps.Animation.DROP,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#E53935',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2
+                }
+            });
+
+            // Update marker on click and dispatch to Flutter
+            map.addListener('click', function(e) {
+                marker.setPosition(e.latLng);
+                if (window.LocationPicked) {
+                    window.LocationPicked.postMessage(JSON.stringify({
+                        lat: e.latLng.lat(),
+                        lng: e.latLng.lng()
+                    }));
+                }
+            });
+        }
+
         // ─── PHASE 1: DRAW FIXED ROUTE WITH STOPS ────────────────────────────────
         // stopsJson = JSON string: [{name, lat, lng, order}, ...]
         function drawFixedRoute(stopsJson) {
@@ -226,9 +270,9 @@
                     map: map,
                     title: 'Bus',
                     icon: {
-                        url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
-                        scaledSize: new google.maps.Size(42, 42),
-                        anchor: new google.maps.Point(21, 42)
+                        url: 'https://cdn-icons-png.flaticon.com/512/5759/5759248.png',
+                        scaledSize: new google.maps.Size(50, 50),
+                        anchor: new google.maps.Point(25, 25)
                     },
                     zIndex: 6
                 });
@@ -307,9 +351,9 @@
                     map: map,
                     title: 'Bus',
                     icon: {
-                        url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
-                        scaledSize: new google.maps.Size(42, 42),
-                        anchor: new google.maps.Point(21, 42)
+                        url: 'https://cdn-icons-png.flaticon.com/512/5759/5759248.png',
+                        scaledSize: new google.maps.Size(50, 50),
+                        anchor: new google.maps.Point(25, 25)
                     },
                     zIndex: 6
                 });
@@ -452,7 +496,7 @@
 
     <!-- Google Maps JS API -->
     <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD-vvo5aSWtDHKLu5jYP6JhPjXQ1tOL1k8&libraries=geometry,directions&callback=initMap"
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBVT50AKwxU-LXS3EvcW9FQDQBXEFGxcI0&libraries=geometry,directions&callback=initMap"
         async defer>
         </script>
 
