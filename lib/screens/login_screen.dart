@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
+import 'bus_list_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +35,14 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text,
         _passwordController.text,
       );
-      // Navigation is handled by the auth state listener in main.dart
+      // Explicitly navigate so the user doesn't stay stuck on LoginScreen
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const BusListScreen()),
+          (_) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
         String message = 'Login failed. Please try again.';

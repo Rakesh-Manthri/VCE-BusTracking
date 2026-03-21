@@ -1,415 +1,461 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Bus Tracker</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100vw; }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
     </style>
 </head>
+
 <body>
-<div id="map"></div>
+    <div id="map"></div>
 
-<script>
-    // ─── STATE ────────────────────────────────────────────────────────────────
-    var map, directionsService;
+    <script>
+        // ─── STATE ────────────────────────────────────────────────────────────────
+        var map, directionsService;
 
-    // live tracking
-    var liveDirectionsRenderer, busMarker, userMarker;
+        // live tracking
+        var liveDirectionsRenderer, busMarker, userMarker;
 
-    // fixed route polyline + stop markers
-    var fixedRouteRenderer, fixedRouteStopMarkers = [];
+        // fixed route polyline + stop markers
+        var fixedRouteRenderer, fixedRouteStopMarkers = [];
 
-    // walking nav
-    var walkRenderer;
+        // walking nav
+        var walkRenderer;
 
-    // Phase-5 detection state
-    var routePath = null;          // google.maps.Polyline decoded points
-    var stopsForDetection = [];    // [{lat,lng,name}, ...]
-    var isBoarded = false;
+        // Phase-5 detection state
+        var routePath = null;          // google.maps.Polyline decoded points
+        var stopsForDetection = [];    // [{lat,lng,name}, ...]
+        var isBoarded = false;
+        var destinationPos = null;
 
-    // ─── INIT ─────────────────────────────────────────────────────────────────
-    function initMap() {
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: { lat: 17.3850, lng: 78.4867 },
-            zoom: 14,
-            mapTypeId: 'roadmap',
-            zoomControl: true,
-            streetViewControl: false,
-            fullscreenControl: false,
-            mapTypeControl: false
-        });
-
-        directionsService = new google.maps.DirectionsService();
-
-        // live route renderer (dark blue, thick)
-        liveDirectionsRenderer = new google.maps.DirectionsRenderer({
-            suppressMarkers: true,
-            polylineOptions: {
-                strokeColor: '#1A237E',
-                strokeWeight: 5,
-                strokeOpacity: 0.85
-            }
-        });
-        liveDirectionsRenderer.setMap(map);
-
-        // walking renderer (teal, dashed)
-        walkRenderer = new google.maps.DirectionsRenderer({
-            suppressMarkers: true,
-            polylineOptions: {
-                strokeColor: '#00897B',
-                strokeWeight: 4,
-                strokeOpacity: 0,
-                icons: [{
-                    icon: {
-                        path: 'M 0,-1 0,1',
-                        strokeOpacity: 1,
-                        scale: 4
-                    },
-                    offset: '0',
-                    repeat: '16px'
-                }]
-            }
-        });
-        walkRenderer.setMap(map);
-    }
-
-    // ─── PHASE 1: DRAW FIXED ROUTE WITH STOPS ────────────────────────────────
-    // stopsJson = JSON string: [{name, lat, lng, order}, ...]
-    function drawFixedRoute(stopsJson) {
-        var stops;
-        try { stops = JSON.parse(stopsJson); } catch(e) { return; }
-        if (!stops || stops.length < 2) return;
-
-        // clear previous fixed route
-        if (fixedRouteRenderer) {
-            fixedRouteRenderer.setMap(null);
-            fixedRouteRenderer = null;
-        }
-        fixedRouteStopMarkers.forEach(function(m) { m.setMap(null); });
-        fixedRouteStopMarkers = [];
-
-        // store stops for Phase-5 detection
-        stopsForDetection = stops;
-
-        var waypoints = stops.slice(1, stops.length - 1).map(function(s) {
-            return { location: new google.maps.LatLng(s.lat, s.lng), stopover: true };
-        });
-
-        fixedRouteRenderer = new google.maps.DirectionsRenderer({
-            suppressMarkers: true,
-            preserveViewport: true,
-            polylineOptions: {
-                strokeColor: '#1A237E',
-                strokeWeight: 4,
-                strokeOpacity: 0.5
-            }
-        });
-        fixedRouteRenderer.setMap(map);
-
-        directionsService.route({
-            origin: new google.maps.LatLng(stops[0].lat, stops[0].lng),
-            destination: new google.maps.LatLng(stops[stops.length - 1].lat, stops[stops.length - 1].lng),
-            waypoints: waypoints,
-            travelMode: google.maps.TravelMode.DRIVING
-        }, function(result, status) {
-            if (status === 'OK') {
-                fixedRouteRenderer.setDirections(result);
-
-                // decode all overview path points for off-route detection
-                routePath = result.routes[0].overview_path;
-
-                // fit map
-                var bounds = new google.maps.LatLngBounds();
-                result.routes[0].overview_path.forEach(function(p) { bounds.extend(p); });
-                map.fitBounds(bounds);
-            }
-        });
-
-        // place numbered stop markers
-        stops.forEach(function(stop, idx) {
-            var isFirst = idx === 0;
-            var isLast  = idx === stops.length - 1;
-
-            var label = isFirst ? 'S' : isLast ? 'E' : String(idx);
-            var bgColor = isFirst ? '#43A047' : isLast ? '#E53935' : '#1A237E';
-
-            var marker = new google.maps.Marker({
-                position: { lat: stop.lat, lng: stop.lng },
-                map: map,
-                title: stop.name,
-                label: {
-                    text: label,
-                    color: '#ffffff',
-                    fontWeight: 'bold',
-                    fontSize: '11px'
-                },
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 14,
-                    fillColor: bgColor,
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2
-                },
-                zIndex: 4
-            });
-
-            var infoWindow = new google.maps.InfoWindow({
-                content: '<b>' + stop.name + '</b>'
-            });
-            marker.addListener('click', function() {
-                infoWindow.open(map, marker);
-            });
-
-            fixedRouteStopMarkers.push(marker);
-        });
-    }
-
-    // ─── EXISTING: LIVE BUS TRACKING (Phase 1 student view) ──────────────────
-    // Called from Flutter every GPS tick when bus is online
-    function updateBusRoute(userLat, userLng, busLat, busLng) {
-        if (!map) return;
-        if (isBoarded) return; // Phase 5: stop updating when boarded
-
-        var userPos = { lat: parseFloat(userLat), lng: parseFloat(userLng) };
-        var busPos  = { lat: parseFloat(busLat),  lng: parseFloat(busLng)  };
-
-        // user marker (blue dot)
-        if (userMarker) {
-            userMarker.setPosition(userPos);
-        } else {
-            userMarker = new google.maps.Marker({
-                position: userPos,
-                map: map,
-                title: 'You',
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 9,
-                    fillColor: '#4285F4',
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2.5
-                },
-                zIndex: 5
-            });
-        }
-
-        // bus marker
-        if (busMarker) {
-            busMarker.setPosition(busPos);
-        } else {
-            busMarker = new google.maps.Marker({
-                position: busPos,
-                map: map,
-                title: 'Bus',
-                icon: {
-                    url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
-                    scaledSize: new google.maps.Size(42, 42),
-                    anchor: new google.maps.Point(21, 42)
-                },
-                zIndex: 6
-            });
-            busMarker.addListener('click', function() {
-                new google.maps.InfoWindow({ content: '<b>Bus Location</b>' })
-                    .open(map, busMarker);
-            });
-        }
-
-        // live Directions route (user → bus)
-        directionsService.route({
-            origin: userPos,
-            destination: busPos,
-            travelMode: google.maps.TravelMode.DRIVING
-        }, function(result, status) {
-            if (status === 'OK') {
-                liveDirectionsRenderer.setDirections(result);
-                var leg = result.routes[0].legs[0];
-                if (window.RouteInfo) {
-                    window.RouteInfo.postMessage(
-                        JSON.stringify({
-                            distance: leg.distance.text,
-                            duration: leg.duration.text
-                        })
-                    );
+        function setManualBoarded(state, dLat, dLng) {
+            isBoarded = state;
+            if (state && dLat !== undefined && dLng !== undefined) {
+                destinationPos = { lat: parseFloat(dLat), lng: parseFloat(dLng) };
+                if (window.BoardingDetected) {
+                    window.BoardingDetected.postMessage('boarded');
                 }
             } else {
-                liveDirectionsRenderer.setDirections({ routes: [] });
-                var bounds = new google.maps.LatLngBounds();
-                bounds.extend(userPos);
-                bounds.extend(busPos);
-                map.fitBounds(bounds);
+                destinationPos = null;
             }
-        });
-
-        // Phase 5 detection calls
-        _checkOffRoute(busLat, busLng);
-        _checkStopArrival(userLat, userLng);
-        _checkBoarding(userLat, userLng, busLat, busLng);
-    }
-
-    // Called from Flutter when no user GPS yet
-    function centerMap(lat, lng) {
-        if (!map) return;
-        var pos = { lat: parseFloat(lat), lng: parseFloat(lng) };
-        if (busMarker) {
-            busMarker.setPosition(pos);
-        } else {
-            busMarker = new google.maps.Marker({
-                position: pos,
-                map: map,
-                title: 'Bus',
-                icon: {
-                    url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
-                    scaledSize: new google.maps.Size(42, 42),
-                    anchor: new google.maps.Point(21, 42)
-                },
-                zIndex: 6
-            });
-        }
-        map.setCenter(pos);
-        map.setZoom(16);
-    }
-
-    // ─── PHASE 4: STUDENT WALKING NAVIGATION TO STOP ─────────────────────────
-    function navigateToStop(userLat, userLng, stopLat, stopLng, stopName) {
-        if (!map) return;
-        var userPos = { lat: parseFloat(userLat), lng: parseFloat(userLng) };
-        var stopPos = { lat: parseFloat(stopLat), lng: parseFloat(stopLng) };
-
-        // update user marker
-        if (userMarker) {
-            userMarker.setPosition(userPos);
-        } else {
-            userMarker = new google.maps.Marker({
-                position: userPos,
-                map: map,
-                title: 'You',
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 9,
-                    fillColor: '#4285F4',
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2.5
-                },
-                zIndex: 5
-            });
         }
 
-        directionsService.route({
-            origin: userPos,
-            destination: stopPos,
-            travelMode: google.maps.TravelMode.WALKING
-        }, function(result, status) {
-            if (status === 'OK') {
-                walkRenderer.setDirections(result);
-                var leg = result.routes[0].legs[0];
-                if (window.WalkInfo) {
-                    window.WalkInfo.postMessage(
-                        JSON.stringify({
-                            stopName: stopName,
-                            distance: leg.distance.text,
-                            duration: leg.duration.text
-                        })
-                    );
+        // ─── INIT ─────────────────────────────────────────────────────────────────
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 17.3850, lng: 78.4867 },
+                zoom: 14,
+                mapTypeId: 'roadmap',
+                zoomControl: true,
+                streetViewControl: false,
+                fullscreenControl: false,
+                mapTypeControl: false
+            });
+
+            directionsService = new google.maps.DirectionsService();
+
+            // live route renderer (dark blue, thick)
+            liveDirectionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: '#1A237E',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.85
                 }
-                var bounds = new google.maps.LatLngBounds();
-                bounds.extend(userPos);
-                bounds.extend(stopPos);
-                map.fitBounds(bounds, { padding: 60 });
+            });
+            liveDirectionsRenderer.setMap(map);
+
+            // walking renderer (teal, dashed)
+            walkRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: '#00897B',
+                    strokeWeight: 4,
+                    strokeOpacity: 0,
+                    icons: [{
+                        icon: {
+                            path: 'M 0,-1 0,1',
+                            strokeOpacity: 1,
+                            scale: 4
+                        },
+                        offset: '0',
+                        repeat: '16px'
+                    }]
+                }
+            });
+            walkRenderer.setMap(map);
+        }
+
+        // ─── PHASE 1: DRAW FIXED ROUTE WITH STOPS ────────────────────────────────
+        // stopsJson = JSON string: [{name, lat, lng, order}, ...]
+        function drawFixedRoute(stopsJson) {
+            var stops;
+            try { stops = JSON.parse(stopsJson); } catch (e) { return; }
+            if (!stops || stops.length < 2) return;
+
+            // clear previous fixed route
+            if (fixedRouteRenderer) {
+                fixedRouteRenderer.setMap(null);
+                fixedRouteRenderer = null;
             }
-        });
-    }
+            fixedRouteStopMarkers.forEach(function (m) { m.setMap(null); });
+            fixedRouteStopMarkers = [];
 
-    // ─── PHASE 5: SMART DETECTION ─────────────────────────────────────────────
+            // store stops for Phase-5 detection
+            stopsForDetection = stops;
 
-    // Haversine distance in meters
-    function _haversine(lat1, lng1, lat2, lng2) {
-        var R = 6371000;
-        var dLat = (lat2 - lat1) * Math.PI / 180;
-        var dLng = (lng2 - lng1) * Math.PI / 180;
-        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            var waypoints = stops.slice(1, stops.length - 1).map(function (s) {
+                return { location: new google.maps.LatLng(s.lat, s.lng), stopover: true };
+            });
+
+            fixedRouteRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true,
+                preserveViewport: true,
+                polylineOptions: {
+                    strokeColor: '#1A237E',
+                    strokeWeight: 4,
+                    strokeOpacity: 0.5
+                }
+            });
+            fixedRouteRenderer.setMap(map);
+
+            directionsService.route({
+                origin: new google.maps.LatLng(stops[0].lat, stops[0].lng),
+                destination: new google.maps.LatLng(stops[stops.length - 1].lat, stops[stops.length - 1].lng),
+                waypoints: waypoints,
+                travelMode: google.maps.TravelMode.DRIVING
+            }, function (result, status) {
+                if (status === 'OK') {
+                    fixedRouteRenderer.setDirections(result);
+
+                    // decode all overview path points for off-route detection
+                    routePath = result.routes[0].overview_path;
+
+                    // fit map
+                    var bounds = new google.maps.LatLngBounds();
+                    result.routes[0].overview_path.forEach(function (p) { bounds.extend(p); });
+                    map.fitBounds(bounds);
+                }
+            });
+
+            // place numbered stop markers
+            stops.forEach(function (stop, idx) {
+                var isFirst = idx === 0;
+                var isLast = idx === stops.length - 1;
+
+                var label = isFirst ? 'S' : isLast ? 'E' : String(idx);
+                var bgColor = isFirst ? '#43A047' : isLast ? '#E53935' : '#1A237E';
+
+                var marker = new google.maps.Marker({
+                    position: { lat: stop.lat, lng: stop.lng },
+                    map: map,
+                    title: stop.name,
+                    label: {
+                        text: label,
+                        color: '#ffffff',
+                        fontWeight: 'bold',
+                        fontSize: '11px'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 14,
+                        fillColor: bgColor,
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    },
+                    zIndex: 4
+                });
+
+                var infoWindow = new google.maps.InfoWindow({
+                    content: '<b>' + stop.name + '</b>'
+                });
+                marker.addListener('click', function () {
+                    infoWindow.open(map, marker);
+                });
+
+                fixedRouteStopMarkers.push(marker);
+            });
+        }
+
+        // Called from Flutter every GPS tick when bus is online
+        function updateBusRoute(userLat, userLng, busLat, busLng) {
+            if (!map) return;
+
+            var userPos = { lat: parseFloat(userLat), lng: parseFloat(userLng) };
+            var busPos = { lat: parseFloat(busLat), lng: parseFloat(busLng) };
+
+            // user marker (blue dot)
+            if (userMarker) {
+                userMarker.setPosition(userPos);
+            } else {
+                userMarker = new google.maps.Marker({
+                    position: userPos,
+                    map: map,
+                    title: 'You',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 9,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2.5
+                    },
+                    zIndex: 5
+                });
+            }
+
+            // bus marker
+            if (busMarker) {
+                busMarker.setPosition(busPos);
+            } else {
+                busMarker = new google.maps.Marker({
+                    position: busPos,
+                    map: map,
+                    title: 'Bus',
+                    icon: {
+                        url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+                        scaledSize: new google.maps.Size(42, 42),
+                        anchor: new google.maps.Point(21, 42)
+                    },
+                    zIndex: 6
+                });
+                busMarker.addListener('click', function () {
+                    new google.maps.InfoWindow({ content: '<b>Bus Location</b>' })
+                        .open(map, busMarker);
+                });
+            }
+
+            // If boarded and we have a destination, route from bus to destination
+            if (isBoarded) {
+                if (destinationPos) {
+                    directionsService.route({
+                        origin: busPos,
+                        destination: destinationPos,
+                        travelMode: google.maps.TravelMode.DRIVING
+                    }, function (result, status) {
+                        if (status === 'OK') {
+                            liveDirectionsRenderer.setDirections(result);
+                            var leg = result.routes[0].legs[0];
+                            if (window.RouteInfo) {
+                                window.RouteInfo.postMessage(
+                                    JSON.stringify({
+                                        distance: leg.distance.text,
+                                        duration: leg.duration.text
+                                    })
+                                );
+                            }
+                        }
+                    });
+                }
+                return; // Stop the rest of the checks if boarded
+            }
+
+            // live Directions route (user → bus)
+            directionsService.route({
+                origin: userPos,
+                destination: busPos,
+                travelMode: google.maps.TravelMode.DRIVING
+            }, function (result, status) {
+                if (status === 'OK') {
+                    liveDirectionsRenderer.setDirections(result);
+                    var leg = result.routes[0].legs[0];
+                    if (window.RouteInfo) {
+                        window.RouteInfo.postMessage(
+                            JSON.stringify({
+                                distance: leg.distance.text,
+                                duration: leg.duration.text
+                            })
+                        );
+                    }
+                } else {
+                    liveDirectionsRenderer.setDirections({ routes: [] });
+                    var bounds = new google.maps.LatLngBounds();
+                    bounds.extend(userPos);
+                    bounds.extend(busPos);
+                    map.fitBounds(bounds);
+                }
+            });
+
+            // Phase 5 detection calls
+            _checkOffRoute(busLat, busLng);
+            _checkStopArrival(userLat, userLng);
+            _checkBoarding(userLat, userLng, busLat, busLng);
+        }
+
+        // Called from Flutter when no user GPS yet
+        function centerMap(lat, lng) {
+            if (!map) return;
+            var pos = { lat: parseFloat(lat), lng: parseFloat(lng) };
+            if (busMarker) {
+                busMarker.setPosition(pos);
+            } else {
+                busMarker = new google.maps.Marker({
+                    position: pos,
+                    map: map,
+                    title: 'Bus',
+                    icon: {
+                        url: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+                        scaledSize: new google.maps.Size(42, 42),
+                        anchor: new google.maps.Point(21, 42)
+                    },
+                    zIndex: 6
+                });
+            }
+            map.setCenter(pos);
+            map.setZoom(16);
+        }
+
+        // ─── PHASE 4: STUDENT WALKING NAVIGATION TO STOP ─────────────────────────
+        function navigateToStop(userLat, userLng, stopLat, stopLng, stopName) {
+            if (!map) return;
+            var userPos = { lat: parseFloat(userLat), lng: parseFloat(userLng) };
+            var stopPos = { lat: parseFloat(stopLat), lng: parseFloat(stopLng) };
+
+            // update user marker
+            if (userMarker) {
+                userMarker.setPosition(userPos);
+            } else {
+                userMarker = new google.maps.Marker({
+                    position: userPos,
+                    map: map,
+                    title: 'You',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 9,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2.5
+                    },
+                    zIndex: 5
+                });
+            }
+
+            directionsService.route({
+                origin: userPos,
+                destination: stopPos,
+                travelMode: google.maps.TravelMode.WALKING
+            }, function (result, status) {
+                if (status === 'OK') {
+                    walkRenderer.setDirections(result);
+                    var leg = result.routes[0].legs[0];
+                    if (window.WalkInfo) {
+                        window.WalkInfo.postMessage(
+                            JSON.stringify({
+                                stopName: stopName,
+                                distance: leg.distance.text,
+                                duration: leg.duration.text
+                            })
+                        );
+                    }
+                    var bounds = new google.maps.LatLngBounds();
+                    bounds.extend(userPos);
+                    bounds.extend(stopPos);
+                    map.fitBounds(bounds, { padding: 60 });
+                }
+            });
+        }
+
+        // ─── PHASE 5: SMART DETECTION ─────────────────────────────────────────────
+
+        // Haversine distance in meters
+        function _haversine(lat1, lng1, lat2, lng2) {
+            var R = 6371000;
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLng = (lng2 - lng1) * Math.PI / 180;
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLng/2) * Math.sin(dLng/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    // Min cross-track distance from point to any segment of routePath
-    function _minDistanceToRoute(lat, lng) {
-        if (!routePath || routePath.length < 2) return 0;
-        var minDist = Infinity;
-        for (var i = 0; i < routePath.length - 1; i++) {
-            var d = _haversine(lat, lng, routePath[i].lat(), routePath[i].lng());
-            if (d < minDist) minDist = d;
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
-        return minDist;
-    }
 
-    var _offRouteAlerted = false;
-    function _checkOffRoute(busLat, busLng) {
-        if (!routePath) return;
-        var dist = _minDistanceToRoute(parseFloat(busLat), parseFloat(busLng));
-        if (dist > 50) {
-            if (!_offRouteAlerted && window.OffRouteAlert) {
-                window.OffRouteAlert.postMessage('off');
-                _offRouteAlerted = true;
+        // Min cross-track distance from point to any segment of routePath
+        function _minDistanceToRoute(lat, lng) {
+            if (!routePath || routePath.length < 2) return 0;
+            var minDist = Infinity;
+            for (var i = 0; i < routePath.length - 1; i++) {
+                var d = _haversine(lat, lng, routePath[i].lat(), routePath[i].lng());
+                if (d < minDist) minDist = d;
             }
-        } else {
-            _offRouteAlerted = false;
-            if (window.OffRouteAlert) {
-                window.OffRouteAlert.postMessage('on');
-            }
+            return minDist;
         }
-    }
 
-    var _reachedStop = false;
-    function _checkStopArrival(userLat, userLng) {
-        if (_reachedStop || stopsForDetection.length === 0) return;
-        var uLat = parseFloat(userLat), uLng = parseFloat(userLng);
-        for (var i = 0; i < stopsForDetection.length; i++) {
-            var s = stopsForDetection[i];
-            if (_haversine(uLat, uLng, s.lat, s.lng) < 5) {
-                _reachedStop = true;
-                if (window.StopArrived) {
-                    window.StopArrived.postMessage(s.name);
+        var _offRouteAlerted = false;
+        function _checkOffRoute(busLat, busLng) {
+            if (!routePath) return;
+            var dist = _minDistanceToRoute(parseFloat(busLat), parseFloat(busLng));
+            if (dist > 50) {
+                if (!_offRouteAlerted && window.OffRouteAlert) {
+                    window.OffRouteAlert.postMessage('off');
+                    _offRouteAlerted = true;
                 }
-                break;
+            } else {
+                _offRouteAlerted = false;
+                if (window.OffRouteAlert) {
+                    window.OffRouteAlert.postMessage('on');
+                }
             }
         }
-    }
 
-    function _checkBoarding(userLat, userLng, busLat, busLng) {
-        if (isBoarded) return;
-        var dist = _haversine(
-            parseFloat(userLat), parseFloat(userLng),
-            parseFloat(busLat),  parseFloat(busLng)
-        );
-        if (dist < 5) {
-            isBoarded = true;
-            // hide walking nav
-            walkRenderer.setDirections({ routes: [] });
-            if (window.BoardingDetected) {
-                window.BoardingDetected.postMessage('boarded');
+        var _reachedStop = false;
+        function _checkStopArrival(userLat, userLng) {
+            if (_reachedStop || stopsForDetection.length === 0) return;
+            var uLat = parseFloat(userLat), uLng = parseFloat(userLng);
+            for (var i = 0; i < stopsForDetection.length; i++) {
+                var s = stopsForDetection[i];
+                if (_haversine(uLat, uLng, s.lat, s.lng) < 5) {
+                    _reachedStop = true;
+                    if (window.StopArrived) {
+                        window.StopArrived.postMessage(s.name);
+                    }
+                    break;
+                }
             }
         }
-    }
 
-    // Called from Flutter to reset detection state (e.g. new trip)
-    function resetDetection() {
-        isBoarded = false;
-        _reachedStop = false;
-        _offRouteAlerted = false;
-    }
-</script>
+        function _checkBoarding(userLat, userLng, busLat, busLng) {
+            if (isBoarded) return;
+            var dist = _haversine(
+                parseFloat(userLat), parseFloat(userLng),
+                parseFloat(busLat), parseFloat(busLng)
+            );
+            if (dist < 5) {
+                isBoarded = true;
+                // hide walking nav
+                walkRenderer.setDirections({ routes: [] });
+                if (window.BoardingDetected) {
+                    window.BoardingDetected.postMessage('boarded');
+                }
+            }
+        }
 
-<!-- Google Maps JS API -->
-<script
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=geometry,directions&callback=initMap"
-    async defer>
-</script>
+        // Called from Flutter to reset detection state (e.g. new trip)
+        function resetDetection() {
+            isBoarded = false;
+            _reachedStop = false;
+            _offRouteAlerted = false;
+        }
+    </script>
+
+    <!-- Google Maps JS API -->
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD-vvo5aSWtDHKLu5jYP6JhPjXQ1tOL1k8&libraries=geometry,directions&callback=initMap"
+        async defer>
+        </script>
 
 </body>
+
 </html>

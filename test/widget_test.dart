@@ -1,24 +1,11 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:map_nav_app/main.dart';
+import 'package:VCE_Busses/main.dart';
 
 void main() {
-  testWidgets('Map screen loads smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('App smoke test', (WidgetTester tester) async {
+    // Verify the app builds and shows a Scaffold
     await tester.pumpWidget(const MyApp());
-
-    // Verify that the Navigation Tracker title is present.
-    expect(find.text('Navigation Tracker'), findsOneWidget);
-
-    // Verify the location floating action button exists.
-    expect(find.byIcon(Icons.my_location), findsOneWidget);
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

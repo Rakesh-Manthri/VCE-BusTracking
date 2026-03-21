@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../models/bus_model.dart';
 import '../models/bus_stop_model.dart';
+import '../models/driver_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -285,4 +286,107 @@ class FirestoreService {
         .doc(stop.id)
         .update(stop.toMap());
   }
+
+  // ─── DRIVERS ──────────────────────────────────────────────────────────────
+
+  /// Validate driver credentials — returns Driver if found, null otherwise
+  Future<Driver?> getDriverByCredentials({
+    required String driverId,
+    required String password,
+  }) async {
+    try {
+      final snap = await _firestore
+          .collection('drivers')
+          .where('driverId', isEqualTo: driverId)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return null;
+      final driver = Driver.fromFirestore(snap.docs.first);
+      if (driver.password != password) return null;
+      return driver;
+    } catch (e) {
+      debugPrint('[FirestoreService] getDriverByCredentials error: $e');
+      return null;
+    }
+  }
+
+  /// Real-time stream of all drivers (admin panel)
+  Stream<List<Driver>> getDriversStream() {
+    return _firestore.collection('drivers').snapshots().map(
+          (snap) => snap.docs.map((d) => Driver.fromFirestore(d)).toList(),
+        );
+  }
+
+  /// Add a new driver account (admin only)
+  Future<void> addDriver({
+    required String driverId,
+    required String driverName,
+    required String password,
+    String? assignedBusId,
+  }) async {
+    await _firestore.collection('drivers').add({
+      'driverId': driverId,
+      'driverName': driverName,
+      'password': password,
+      'assignedBusId': assignedBusId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Update driver details (admin only)
+  Future<void> updateDriver({
+    required String docId,
+    required String driverId,
+    required String driverName,
+    required String password,
+    String? assignedBusId,
+  }) async {
+    await _firestore.collection('drivers').doc(docId).update({
+      'driverId': driverId,
+      'driverName': driverName,
+      'password': password,
+      'assignedBusId': assignedBusId,
+    });
+  }
+
+  /// Delete a driver account (admin only)
+  Future<void> deleteDriver(String docId) async {
+    await _firestore.collection('drivers').doc(docId).delete();
+  }
+
+  // ─── SESSION LOGGING ──────────────────────────────────────────────────────
+
+  /// Create a new driving session document. Returns the session doc ID.
+  Future<String> startSession({
+    required String driverId,
+    required String driverName,
+    required String busId,
+    required String busName,
+    required String route,
+    String? direction,
+  }) async {
+    final ref = await _firestore.collection('sessions').add({
+      'driverId': driverId,
+      'driverName': driverName,
+      'busId': busId,
+      'busName': busName,
+      'route': route,
+      'direction': direction,
+      'startTime': FieldValue.serverTimestamp(),
+      'endTime': null,
+      'totalUpdates': 0,
+    });
+    debugPrint('[FirestoreService] Session started: ${ref.id}');
+    return ref.id;
+  }
+
+  /// Close a driving session with end time and update count.
+  Future<void> endSession(String sessionId, int totalUpdates) async {
+    await _firestore.collection('sessions').doc(sessionId).update({
+      'endTime': FieldValue.serverTimestamp(),
+      'totalUpdates': totalUpdates,
+    });
+    debugPrint('[FirestoreService] Session ended: $sessionId');
+  }
 }
+

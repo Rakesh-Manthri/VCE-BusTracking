@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
 import 'screens/bus_list_screen.dart';
+import 'screens/role_selection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,9 +32,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Listens to Firebase Auth state and routes accordingly:
-/// - Logged in → BusListScreen
-/// - Logged out → LoginScreen
+/// Routes authenticated Firebase users (students) directly to BusListScreen.
+/// All other users land on the RoleSelectionScreen to choose Student/Driver/Admin.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -52,13 +51,13 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        // User is logged in
+        // Firebase user logged in → student mode → go to BusListScreen
         if (snapshot.hasData) {
           return const BusListScreen();
         }
 
-        // User is not logged in
-        return const LoginScreen();
+        // Not logged in → show the role selection landing screen
+        return const RoleSelectionScreen();
       },
     );
   }

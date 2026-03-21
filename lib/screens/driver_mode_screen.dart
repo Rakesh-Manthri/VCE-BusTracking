@@ -7,8 +7,16 @@ import '../services/firestore_service.dart';
 
 class DriverModeScreen extends StatefulWidget {
   final Bus bus;
+  // Optional: provided when coming from DriverBusListScreen (driver login flow)
+  final String? driverName;
+  final String? driverId;
 
-  const DriverModeScreen({super.key, required this.bus});
+  const DriverModeScreen({
+    super.key,
+    required this.bus,
+    this.driverName,
+    this.driverId,
+  });
 
   @override
   State<DriverModeScreen> createState() => _DriverModeScreenState();
@@ -29,6 +37,7 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
   Position? _currentPosition;
   int _updateCount = 0;
   String? _chosenDirection;
+  String? _sessionId; // Phase 9: session logging
 
   @override
   void initState() {
@@ -39,8 +48,14 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
 
   @override
   void dispose() {
-    debugPrint('[DriverMode] Disposing — stopping location stream');
-    _stopDriving(showSnackbar: false);
+    debugPrint('[DriverMode] Disposing');
+    // Only release bus if driving was active, to avoid phantom Firestore writes
+    if (_isDriving) {
+      _stopDriving(showSnackbar: false);
+    } else {
+      // Just cancel the GPS stream, no Firestore operation needed
+      _positionStream?.cancel();
+    }
     super.dispose();
   }
 
@@ -75,17 +90,35 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
   // ─── CLAIM ────────────────────────────────────────────────────────────────
 
   Future<void> _claimBus() async {
-    debugPrint('[DriverMode] _claimBus() — getting current user');
+    debugPrint('[DriverMode] _claimBus() — resolving driver identity');
     _setStatus('Checking authentication…');
 
-    final user = _authService.currentUser;
-    if (user == null) {
-      debugPrint('[DriverMode] ERROR — no authenticated user');
-      _setFailed('You are not logged in. Please log out and log back in.');
-      return;
+    // ── Resolve driver identity ──────────────────────────────────────────────
+    // Priority 1: widget.driverId/driverName (from DriverLoginScreen — no Firebase)
+    // Priority 2: Firebase Auth (student-who-is-driver legacy path)
+    String userId;
+    String userName;
+
+    if (widget.driverId != null && widget.driverName != null) {
+      // Driver login path — use the Firestore-based session identity
+      userId = widget.driverId!;
+      userName = widget.driverName!;
+      debugPrint('[DriverMode] Driver session path: id=$userId name=$userName');
+    } else {
+      // Firebase Auth path (fallback)
+      final user = _authService.currentUser;
+      if (user == null) {
+        debugPrint('[DriverMode] ERROR — no Firebase user and no driver session');
+        _setFailed(
+          'Authentication error.\nPlease log out and log in again as a Driver.',
+        );
+        return;
+      }
+      userId = user.uid;
+      userName = user.displayName ?? user.email ?? 'Driver';
+      debugPrint('[DriverMode] Firebase auth path: uid=$userId name=$userName');
     }
 
-    debugPrint('[DriverMode] User authenticated: uid=${user.uid} name=${user.displayName}');
     _setStatus('Claiming bus in Firestore…');
 
     bool success = false;
@@ -94,8 +127,8 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
       success = await _firestoreService
           .claimBus(
             widget.bus.id,
-            user.uid,
-            user.displayName ?? user.email ?? 'Driver',
+            userId,
+            userName,
             travelDirection: _chosenDirection,
           )
           .timeout(
@@ -118,6 +151,10 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
 
     if (success) {
       debugPrint('[DriverMode] Firestore update SUCCESS — starting GPS in background');
+      
+      // Phase 9: start session logging (fire-and-forget)
+      _startSessionLogging(userId: userId, userName: userName);
+
       setState(() {
         _isClaiming = false;
         _isDriving = true;
@@ -125,6 +162,7 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
       // GPS starts AFTER claim — non-blocking
       _startLocationUpdates();
     } else {
+
       debugPrint('[DriverMode] claimBus() returned false — bus already taken or write failed');
       _setFailed('Could not claim this bus.\nIt may already have an active driver, or Firestore write was blocked.');
     }
@@ -139,6 +177,27 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
         _claimError = reason;
       });
     }
+  }
+
+  // Phase 9: fire-and-forget session start
+  void _startSessionLogging({
+    required String userId,
+    required String userName,
+  }) {
+    _firestoreService
+        .startSession(
+          driverId: widget.driverId ?? userId,
+          driverName: widget.driverName ?? userName,
+          busId: widget.bus.id,
+          busName: widget.bus.name,
+          route: widget.bus.route,
+          direction: _chosenDirection,
+        )
+        .then((id) => _sessionId = id)
+        .catchError((e) {
+          debugPrint('[DriverMode] startSession error: $e');
+          return ''; // catchError requires return type String
+        });
   }
 
   // ─── GPS (runs in background after claim succeeds) ─────────────────────────
@@ -209,15 +268,24 @@ class _DriverModeScreenState extends State<DriverModeScreen> {
     await _positionStream?.cancel();
     _positionStream = null;
 
-    final user = _authService.currentUser;
-    if (user != null) {
+    // Resolve driver identity for bus release
+    final driverId = widget.driverId ?? _authService.currentUser?.uid;
+    if (driverId != null) {
       debugPrint('[DriverMode] Releasing bus in Firestore');
       try {
-        await _firestoreService.releaseBus(widget.bus.id, user.uid);
+        await _firestoreService.releaseBus(widget.bus.id, driverId);
         debugPrint('[DriverMode] Bus released successfully');
       } catch (e) {
         debugPrint('[DriverMode] releaseBus() error: $e');
       }
+    }
+
+    // Phase 9: end session logging
+    if (_sessionId != null) {
+      _firestoreService.endSession(_sessionId!, _updateCount).catchError((e) {
+        debugPrint('[DriverMode] endSession error: $e');
+      });
+      _sessionId = null;
     }
 
     if (mounted) {

@@ -54,6 +54,68 @@ class _TrackerScreenState extends State<TrackerScreen> {
     super.initState();
     _initWebView();
     _startTracking();
+
+    if (widget.bus.hasFixedRoute) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _promptBoardingStatus();
+      });
+    }
+  }
+
+  void _promptBoardingStatus() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Boarding Status', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Did you already board the bus?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // User did NOT board the bus
+            },
+            child: const Text('No, waiting for it', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleInitialBoarding();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A237E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Yes, I am on it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleInitialBoarding() {
+    if (!mounted) return;
+    setState(() => _boarded = true);
+    
+    // Determine destination based on travelDirection
+    double? destLat = widget.bus.endLat;
+    double? destLng = widget.bus.endLng;
+    if (widget.bus.travelDirection == 'backward') {
+      destLat = widget.bus.startLat;
+      destLng = widget.bus.startLng;
+    }
+    
+    if (destLat != null && destLng != null && _mapReady) {
+      _webController.runJavaScript('setManualBoarded(true, $destLat, $destLng);');
+    } else {
+       // fallback if map not ready yet
+       Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && destLat != null && destLng != null) {
+              _webController.runJavaScript('setManualBoarded(true, $destLat, $destLng);');
+          }
+       });
+    }
   }
 
   @override
@@ -135,13 +197,13 @@ class _TrackerScreenState extends State<TrackerScreen> {
           });
         },
       )
-      // Phase 5: boarding
+      // Phase 5: boarding detected via JS
       ..addJavaScriptChannel(
         'BoardingDetected',
         onMessageReceived: (JavaScriptMessage msg) {
           if (!mounted) return;
+          _handleInitialBoarding(); // Use the same method to route to destination
           setState(() {
-            _boarded = true;
             _isNavigating = false;
           });
         },
@@ -212,11 +274,11 @@ class _TrackerScreenState extends State<TrackerScreen> {
       return;
     }
 
-    if (_userPosition != null && !_boarded) {
+    if (_userPosition != null) {
       _webController.runJavaScript(
         'updateBusRoute(${_userPosition!.latitude}, ${_userPosition!.longitude}, ${bus.lat}, ${bus.lng});',
       );
-    } else if (!_boarded) {
+    } else {
       _webController.runJavaScript('centerMap(${bus.lat}, ${bus.lng});');
     }
   }
@@ -359,46 +421,32 @@ class _TrackerScreenState extends State<TrackerScreen> {
               ),
             ),
 
-          // Phase 5: BOARDED overlay
+          // Phase 5: BOARDED banner
           if (_boarded)
-            Positioned.fill(
+            Positioned(
+              top: _busOffRoute ? 52 : 12,
+              left: 16,
+              right: 16,
               child: Container(
-                color: Colors.black.withAlpha(160),
-                child: Center(
-                  child: Container(
-                    margin: const EdgeInsets.all(32),
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade700,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 8, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.directions_bus_rounded, color: Colors.white, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'You are on the bus. Enjoy your ride!',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.directions_bus_rounded,
-                              size: 48, color: Colors.teal.shade600),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text('Travelling with Bus',
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'You have boarded the bus.\nEnjoy your ride!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: Colors.grey.shade600, height: 1.5),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -495,7 +543,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
             ),
 
           // Bottom info bar (when online)
-          if (isOnline && !_boarded)
+          if (isOnline)
             Positioned(
               left: 0,
               right: 0,
@@ -507,7 +555,8 @@ class _TrackerScreenState extends State<TrackerScreen> {
                   if (bus.hasFixedRoute &&
                       _nearestStop != null &&
                       _userPosition != null &&
-                      !_reachedStop)
+                      !_reachedStop && 
+                      !_boarded)
                     Padding(
                       padding:
                           const EdgeInsets.fromLTRB(16, 0, 16, 8),

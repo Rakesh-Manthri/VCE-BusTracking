@@ -4,8 +4,8 @@ import '../services/firestore_service.dart';
 import '../models/bus_model.dart';
 import '../widgets/bus_card.dart';
 import 'admin_login_screen.dart';
-import 'driver_mode_screen.dart';
 import 'tracker_screen.dart';
+import 'role_selection_screen.dart';
 
 class BusListScreen extends StatefulWidget {
   const BusListScreen({super.key});
@@ -73,7 +73,13 @@ class _BusListScreenState extends State<BusListScreen> {
                 ),
               );
               if (confirm == true) {
+                final nav = Navigator.of(context);
                 await _authService.signOut();
+                nav.pushAndRemoveUntil(
+                  MaterialPageRoute(
+                      builder: (_) => const RoleSelectionScreen()),
+                  (_) => false,
+                );
               }
             },
           ),
@@ -202,14 +208,8 @@ class _BusListScreenState extends State<BusListScreen> {
                     return BusCard(
                       bus: bus,
                       currentUserId: user?.uid ?? '',
-                      onDrive: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DriverModeScreen(bus: bus),
-                          ),
-                        );
-                      },
+                      userRole: UserRole.student, // students only Track
+                      onDrive: () {}, // not accessible in student mode
                       onTrack: () {
                         Navigator.push(
                           context,
